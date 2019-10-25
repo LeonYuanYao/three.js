@@ -14,263 +14,248 @@
 		b {
 			color: lightgreen;
 		}
+
+		#mask {
+			position: absolute;
+			width: 100%;
+			height: 100%;
+			background-color: rgba(0, 0, 0, 0.5);
+		}
+
+		#text {
+			position: absolute;
+			font-size: 30px;
+			width: 100%;
+			top: 50%;
+			text-align: center;
+			cursor: pointer;
+		}
 	</style>
 </head>
 
 <body>
-	<div id="info"><a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> - minimap<br />
+	<div id="info"><a href="http://threejs.org" target="_blank" rel="noopener">three.js</a><a> - minimap</a><br />
+	</div>
+
+	<div id="mask">
+		<div id="text">Click to start</div>
 	</div>
 
 	<script type="module">
 
 		import * as THREE from '../build/three.module.js';
+		import { PointerLockControls } from './jsm/controls/PointerLockControls.js';
+		import { GUI } from './jsm/libs/dat.gui.module.js';
+		import { Minimap } from './jsm/misc/Minimap.js';
 
-		import Stats from '../examples/jsm/libs/stats.module.js';
-
-		var SCREEN_WIDTH = window.innerWidth;
-		var SCREEN_HEIGHT = window.innerHeight;
-		var aspect = SCREEN_WIDTH / SCREEN_HEIGHT;
-
-		var container, stats;
-		var camera, scene, renderer, mesh;
-		var mainCamera, minimapCamera;
-		var mainCameraHelper, minimapCameraHelper;
-		var lookat = new THREE.Vector3(), lastLookat = new THREE.Vector3();
-		var fov = 60;
-		var frustumSize = 1000;
-		var mapSize = 300;
+		var camera, scene, renderer, controls;
+		var objects = [];
+		var raycaster;
+		var moveForward = false;
+		var moveBackward = false;
+		var moveLeft = false;
+		var moveRight = false;
+		var canJump = false;
+		var isPointerLocked = true;
+		var prevTime = performance.now();
+		var velocity = new THREE.Vector3();
+		var direction = new THREE.Vector3();
+		var vertex = new THREE.Vector3();
+		var color = new THREE.Color();
+		var params = {
+			viewRange: 300, 
+			mapSize: 300
+		};
+		var minimap;
 
 		init();
+
 		animate();
 
 		function init() {
-
-			container = document.createElement('div');
-			document.body.appendChild(container);
-
-			scene = new THREE.Scene();
-
-			mainCamera = new THREE.PerspectiveCamera(fov, aspect, 0.01, 10000);
-			getLookatVecProjected(mainCamera, lastLookat);
-			mainCameraHelper = new THREE.CameraHelper(mainCamera);
-			scene.add(mainCameraHelper);
-
-			//
-			minimapCamera = new THREE.OrthographicCamera(
-				-frustumSize / 2,
-				frustumSize / 2,
-				frustumSize / 2,
-				-frustumSize / 2,
-				0.01,
-				10000);
-			// set orthographic camera always look downward
-			minimapCamera.lookAt(new THREE.Vector3(0, -1, 0));
-
-			minimapCameraHelper = new THREE.CameraHelper(minimapCamera);
-			scene.add(minimapCameraHelper);
-
-			//
-			initMeshes();
-
-			initBackplane(0x000000);
-
-			initIndicator();
-
 			//
 			renderer = new THREE.WebGLRenderer({ antialias: true });
-			renderer.autoClear = false;
 			renderer.setPixelRatio(window.devicePixelRatio);
-			renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
-			container.appendChild(renderer.domElement);
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			document.body.appendChild(renderer.domElement);
 
-			//
-			stats = new Stats();
-			container.appendChild(stats.dom);
+			camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000);
+			camera.position.y = 10;
+			scene = new THREE.Scene();
+			scene.background = new THREE.Color(0xffffff);
+			scene.fog = new THREE.Fog(0xffffff, 0, 200);
 
-			//
-			window.addEventListener('resize', onWindowResize, false);
-		}
+			var light = new THREE.HemisphereLight(0xeeeeff, 0x777788, 0.75);
+			light.position.set(0.5, 1, 0.75);
+			scene.add(light);
 
-		//
-		function getLookatVecProjected(object, result) {
-			object.getWorldDirection(result);
-			result.projectOnPlane(new THREE.Vector3(0, -1, 0)); // get the lookat vector projected on the orthographic camera
-		}
+			//camera controls
+			controls = new PointerLockControls(camera, renderer.domElement);
+			scene.add(controls.getObject());
 
-		//
-		function initMeshes() {
-			mesh = new THREE.Mesh(
-				new THREE.SphereBufferGeometry(100, 32, 8),
-				new THREE.MeshBasicMaterial({ color: 0xff0000 })
-			);
-			scene.add(mesh);
+			var mask = document.getElementById('mask');
+			var text = document.getElementById('text');
 
-			var mesh2 = new THREE.Mesh(
-				new THREE.SphereBufferGeometry(50, 32, 8),
-				new THREE.MeshBasicMaterial({ color: 0x00ff00 })
-			);
-			mesh2.position.y = 150;
-			mesh.add(mesh2);
+			mask.addEventListener('click', function () {
+				controls.lock();
+			}, false);
 
-			var mesh3 = new THREE.Mesh(
-				new THREE.SphereBufferGeometry(20, 32, 8),
-				new THREE.MeshBasicMaterial({ color: 0x0000ff })
-			);
-			mesh3.position.z = 150;
-			mesh.add(mesh3);
+			controls.addEventListener('lock', function () {
+				mask.style.display = 'none';
+			});
+			controls.addEventListener('unlock', function () {
+				mask.style.display = 'block';
+				text.innerText = 'Click to continue';
+			});
 
-			var plane = new THREE.Mesh(
-				new THREE.BoxBufferGeometry(200, 1, 200),
-				new THREE.MeshBasicMaterial({ color: 0x00ffff })
-			);
-			plane.position.y = 100;
-			plane.position.z = -200;
-			scene.add(plane);
-		}
+			renderer.domElement.addEventListener('click', function () {
+				controls.unlock();
+				mask.style.display = 'block';
+			}, false);
 
-		//
-		function initBackplane(color) {
-			var width = Math.abs(minimapCamera.left - minimapCamera.right);
-			var height = Math.abs(minimapCamera.top - minimapCamera.bottom);
-			var plane = new THREE.Mesh(
-				new THREE.PlaneBufferGeometry(width, height, 1),
-				new THREE.MeshBasicMaterial({ color: color, side: THREE.FrontSide })
-			);
-			plane.quaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), - Math.PI / 2);
-			scene.add(plane);
-			minimapCamera.backplane = plane;
-		}
+			var onKeyDown = function (event) {
 
-		//
-		function initIndicator() {
-			var sector = new THREE.Mesh(
-				new THREE.RingBufferGeometry(mapSize, 1, 10, 1, (0.5 - fov / 180) * Math.PI, fov / 90 * Math.PI),
-				new THREE.MeshBasicMaterial({ color: 0xff00ff, side: THREE.DoubleSide, transparent: true, opacity: 0.3 })
-			);
-			sector.quaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
-			var sectorLookat = new THREE.Vector3();
-			getLookatVecProjected(sector, sectorLookat);
-			sector.rotateZ(lastLookat.angleTo(sectorLookat)); // set the sector indicator rotation the same with mainCamera lookat
-			scene.add(sector);
+				if (!controls.isLocked) return; 
 
-			var dot = new THREE.Mesh(
-				new THREE.CircleBufferGeometry(mapSize / 15, 16, 0, 2 * Math.PI),
-				new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })
-			);
-			dot.quaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
-			scene.add(dot);
-
-			minimapCamera.indicator = {
-				dot: dot,
-				sector: sector,
-				setVisible: function (flag) {
-					this.dot.visible = flag;
-					this.sector.visible = flag;
+				switch (event.keyCode) {
+					case 38: // up
+					case 87: // w
+						moveForward = true;
+						break;
+					case 37: // left
+					case 65: // a
+						moveLeft = true;
+						break;
+					case 40: // down
+					case 83: // s
+						moveBackward = true;
+						break;
+					case 39: // right
+					case 68: // d
+						moveRight = true;
+						break;
+					case 32: // space
+						if (canJump === true) velocity.y += 250;
+						canJump = false;
+						break;
 				}
 			};
+
+			var onKeyUp = function (event) {
+				switch (event.keyCode) {
+					case 38: // up
+					case 87: // w
+						moveForward = false;
+						break;
+					case 37: // left
+					case 65: // a
+						moveLeft = false;
+						break;
+					case 40: // down
+					case 83: // s
+						moveBackward = false;
+						break;
+					case 39: // right
+					case 68: // d
+						moveRight = false;
+						break;
+				}
+			};
+
+			document.addEventListener('keydown', onKeyDown, false);
+			document.addEventListener('keyup', onKeyUp, false);
+
+			raycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, - 1, 0), 0, 10);
+
+			// ground mesh
+			var groundGeometry = new THREE.PlaneBufferGeometry(2000, 2000, 100, 100);
+			groundGeometry.rotateX(- Math.PI / 2);
+			var groundMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.2, 0.75, 0.5) });
+			var ground = new THREE.Mesh(groundGeometry, groundMaterial);
+			scene.add(ground);
+
+			// obstacles
+			for (var i = 0; i < 600; i++) {
+				var boxGeometry = new THREE.BoxBufferGeometry(20, 80, 20);
+				var boxMaterial = new THREE.MeshPhongMaterial({ 
+					specular: new THREE.Color(Math.random(), Math.random(), Math.random()), 
+					flatShading: true 
+				});
+				boxMaterial.color.setHSL(Math.random() * 0.2 + 0.4, 0.6, Math.random() * 0.3 + 0.75); //Math.random() * 0.2 + 0.5
+				var box = new THREE.Mesh(boxGeometry, boxMaterial);
+				box.position.x = Math.floor(Math.random() * 40 - 20) * 20;
+				box.position.z = Math.floor(Math.random() * 40 - 20) * 20;
+				if (box.position.x == 0 && box.position.z == 0) continue;
+				scene.add(box);
+				objects.push(box);
+			}
+
+			// init minimap
+			minimap = new Minimap(renderer, scene, camera, {
+				viewRange: params.viewRange, 
+				mapSize: params.mapSize, 
+				heightOffset: 100
+			});
+
+			var gui = new GUI();
+			gui.add(params, 'viewRange', 100, 800);
+			gui.add(params, 'mapSize', 100, 500);
+			gui.open();
+
+			//
+			window.addEventListener('resize', function () {
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize(window.innerWidth, window.innerHeight);
+			}, false);
 		}
 
-		//
-		function updateMinimapCamera() {
-			minimapCamera.position.set(mainCamera.position.x, mainCamera.position.y - 10, mainCamera.position.z);
-			minimapCamera.updateMatrixWorld();
-			minimapCamera.backplane.position.set(mainCamera.position.x, mainCamera.position.y - minimapCamera.far, mainCamera.position.z);
-
-			var idc = minimapCamera.indicator;
-			idc.sector.position.set(minimapCamera.position.x, minimapCamera.position.y - 1, minimapCamera.position.z);
-			idc.dot.position.set(minimapCamera.position.x, minimapCamera.position.y - 1, minimapCamera.position.z);
-
-			getLookatVecProjected(mainCamera, lookat);
-
-			var angle = lookat.angleTo(lastLookat);
-			idc.sector.rotateZ(angle); // rotate the indicator to the direction of mainCamera
-			idc.sector.updateMatrixWorld();
-
-			getLookatVecProjected(mainCamera, lastLookat); // store the last lookat vector
-		}
-
-		//
-		function onWindowResize() {
-
-			SCREEN_WIDTH = window.innerWidth;
-			SCREEN_HEIGHT = window.innerHeight;
-			aspect = SCREEN_WIDTH / SCREEN_HEIGHT;
-
-			renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
-
-			camera.aspect = 0.5 * aspect;
-			camera.updateProjectionMatrix();
-
-			mainCamera.aspect = 0.5 * aspect;
-			mainCamera.updateProjectionMatrix();
-
-			minimapCamera.left = - 0.5 * frustumSize * aspect / 2;
-			minimapCamera.right = 0.5 * frustumSize * aspect / 2;
-			minimapCamera.top = frustumSize / 2;
-			minimapCamera.bottom = - frustumSize / 2;
-			minimapCamera.updateProjectionMatrix();
-
-		}
-
-		//
 
 		function animate() {
 
 			requestAnimationFrame(animate);
 
-			render();
-			stats.update();
+			// first person control
+			raycaster.ray.origin.copy(controls.getObject().position);
+			raycaster.ray.origin.y -= 10;
+			var intersections = raycaster.intersectObjects(objects);
+			var onObject = intersections.length > 0;
+			var time = performance.now();
+			var delta = (time - prevTime) / 1000;
+			velocity.x -= velocity.x * 10.0 * delta;
+			velocity.z -= velocity.z * 10.0 * delta;
+			velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
+			direction.z = Number(moveForward) - Number(moveBackward);
+			direction.x = Number(moveRight) - Number(moveLeft);
+			direction.normalize(); // this ensures consistent movements in all directions
+			if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta;
+			if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * delta;
+			if (onObject === true) {
+				velocity.y = Math.max(0, velocity.y);
+				canJump = true;
+			}
+			controls.moveRight(- velocity.x * delta);
+			controls.moveForward(- velocity.z * delta);
+			controls.getObject().position.y += (velocity.y * delta); // new behavior
+			if (controls.getObject().position.y < 10) {
+				velocity.y = 0;
+				controls.getObject().position.y = 10;
+				canJump = true;
+			}
+			prevTime = time;
 
+			// render main scene
+			minimap.setMinimapVisibility(false);
+			scene.fog.far = 200;
+			renderer.render(scene, camera);
+
+			// render minimap
+			scene.fog.far = 100000;
+			minimap.viewRange = params.viewRange;
+			minimap.mapSize = params.mapSize;
+			minimap.renderMinimap();
+			
 		}
-
-
-		function render() {
-
-			var r = 0;
-			var r = Date.now() * 0.0005;
-
-			mainCamera.position.x = 200 * Math.cos(r);
-			mainCamera.position.z = 200 * Math.sin(r);
-			mainCamera.position.y = Math.abs(300 * Math.cos(r));
-
-
-			// set perspective camera lookAt
-			mainCamera.lookAt(mesh.position);
-			mainCamera.updateMatrixWorld();
-
-			// set orthographic camera position to be certain height above perspective camera
-			updateMinimapCamera();
-
-			renderer.clear();
-
-			// render perspective (main) camera
-			minimapCamera.backplane.visible = false;
-			minimapCamera.indicator.setVisible(false);
-			minimapCameraHelper.visible = false;
-			mainCameraHelper.visible = false;
-			renderer.setViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-			renderer.setScissor(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-			// var a = new THREE.Vector4();
-			// renderer.getCurrentViewport(a);
-			// console.log(SCREEN_WIDTH, SCREEN_HEIGHT, a);
-			renderer.setScissorTest(true);
-			renderer.setClearColor(new THREE.Color(0x666666));
-			renderer.render(scene, mainCamera);
-
-
-			// render orthographic (minimap) camera
-			minimapCamera.backplane.visible = true;
-			minimapCamera.indicator.setVisible(true);
-			minimapCameraHelper.visible = false;
-			mainCameraHelper.visible = false;
-			renderer.setViewport(0, 0, mapSize, mapSize);
-			renderer.render(scene, minimapCamera);
-
-		}
-
-
-		window.mainCamera = mainCamera;
-		window.minimapCamera = minimapCamera;
 
 
 	</script>
