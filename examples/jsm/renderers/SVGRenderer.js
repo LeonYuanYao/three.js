@@ -10,7 +10,6 @@ import {
 	Matrix3,
 	Matrix4,
 	Object3D,
-	REVISION,
 	Vector3,
 	VertexColors
 } from "../../../build/three.module.js";
@@ -31,8 +30,6 @@ SVGObject.prototype = Object.create( Object3D.prototype );
 SVGObject.prototype.constructor = SVGObject;
 
 var SVGRenderer = function () {
-
-	console.log( 'THREE.SVGRenderer', REVISION );
 
 	var _this = this,
 		_renderData, _elements, _lights,
@@ -458,7 +455,7 @@ var SVGRenderer = function () {
 
 		} else if ( material.isMeshNormalMaterial ) {
 
-			_normal.copy( element.normalModel ).applyMatrix3( _normalViewMatrix );
+			_normal.copy( element.normalModel ).applyMatrix3( _normalViewMatrix ).normalize();
 
 			_color.setRGB( _normal.x, _normal.y, _normal.z ).multiplyScalar( 0.5 ).addScalar( 0.5 );
 

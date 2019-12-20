@@ -1,4 +1,4 @@
-// r109
+// r111
 
 const assets = [
 	'./',
@@ -12,13 +12,15 @@ const assets = [
 	'../examples/js/libs/chevrotain.min.js',
 	'../examples/js/libs/jszip.min.js',
 	'../examples/js/libs/inflate.min.js',
+	'../examples/js/libs/draco/draco_decoder.js',
+	'../examples/js/libs/draco/draco_decoder.wasm',
+	'../examples/js/libs/draco/draco_wasm_wrapper.js',
 
 	'../examples/js/loaders/AMFLoader.js',
 	'../examples/js/loaders/ColladaLoader.js',
 	'../examples/js/loaders/DRACOLoader.js',
 	'../examples/js/loaders/FBXLoader.js',
 	'../examples/js/loaders/GLTFLoader.js',
-	'../examples/js/loaders/deprecated/LegacyGLTFLoader.js',
 	'../examples/js/loaders/KMZLoader.js',
 	'../examples/js/loaders/MD2Loader.js',
 	'../examples/js/loaders/OBJLoader.js',
@@ -34,11 +36,11 @@ const assets = [
 	'../examples/js/exporters/ColladaExporter.js',
 	'../examples/js/exporters/GLTFExporter.js',
 	'../examples/js/exporters/OBJExporter.js',
+	'../examples/js/exporters/PLYExporter.js',
 	'../examples/js/exporters/STLExporter.js',
 
 	'../examples/js/renderers/Projector.js',
 	'../examples/js/renderers/RaytracingRenderer.js',
-	'../examples/js/renderers/SoftwareRenderer.js',
 	'../examples/js/renderers/SVGRenderer.js',
 
 	'./manifest.json',
@@ -86,13 +88,9 @@ const assets = [
 	'./js/Player.js',
 	'./js/Script.js',
 
-	'../examples/js/vr/WebVR.js',
-
 	//
 
 	'./css/main.css',
-	'./css/dark.css',
-	'./css/light.css',
 
 	'./js/EditorControls.js',
 	'./js/Storage.js',

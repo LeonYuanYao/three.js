@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<title>three.js webgl - materials - standard</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<link type="text/css" rel="stylesheet" href="main.css">
+</head>
+
+<body>
+	<div id="info">
+		<a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> - Geometry Compression Example<br />
+	</div>
+
+	<script type="module">
+
+		import * as THREE from '../build/three.module.js';
+
+		import Stats from './jsm/libs/stats.module.js';
+
+		import { OrbitControls } from './jsm/controls/OrbitControls.js';
+		import { GeometryCompressionUtils, PackedPhongMaterial } from './jsm/utils/GeometryCompressionUtils.js';
+		import { GUI } from './jsm/libs/dat.gui.module.js';
+
+		var statsEnabled = true;
+
+		var container, stats, gui;
+
+		var camera, scene, renderer, controls;
+
+		var lights = [];
+
+		var data = {
+			wireframe: false,
+			defaultEncodeNormal: false,
+			anglesEncodeNormal: false,
+			octEncodeNormal: false,
+			quantizeEncodePos: false,
+			defaultEncodeUV: false,
+			lightsRotation: 1,
+			totalGPUMemory: "0 bytes"
+		};
+		var memoryDisplay;
+
+		var radius = 100;
+		var detail = 5;
+		var uvScale = [];
+
+		// materials
+		var lineMaterial = new THREE.LineBasicMaterial({ color: 0xaaaaaa, transparent: true, opacity: 0.5 });
+		var meshMaterial = new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: 0x111111 });
+
+		var texture = new THREE.TextureLoader().load("textures/uv_grid_opengl.jpg");
+		// var texture = new THREE.TextureLoader().load("textures/uv_grid_opengl_8k.jpg");
+		// var texture = new THREE.TextureLoader().load("textures/brick_diffuse.jpg");
+
+		texture.wrapS = THREE.RepeatWrapping;
+		texture.wrapT = THREE.RepeatWrapping;
+
+		meshMaterial.map = texture;
+
+
+		init();
+		animate();
+
+		function init() {
+
+			//
+
+			// for (let i = 0; i < 1000000; i++) {
+			// 	uvScale.push(Math.random() * 100);
+			// }
+
+			container = document.createElement('div');
+			document.body.appendChild(container);
+
+			renderer = new THREE.WebGLRenderer({ antialias: true });
+			renderer.setPixelRatio(window.devicePixelRatio);
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			container.appendChild(renderer.domElement);
+
+			//
+
+			scene = new THREE.Scene();
+
+			camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 10000000);
+
+			camera.position.x = 3 * radius;
+			camera.position.y = 3 * radius;
+			camera.position.z = 3 * radius;
+
+			controls = new OrbitControls(camera, renderer.domElement);
+
+			//
+			lights[0] = new THREE.PointLight(0xffffff, 1, 0);
+			lights[1] = new THREE.PointLight(0xffffff, 1, 0);
+			lights[2] = new THREE.PointLight(0xffffff, 1, 0);
+
+			lights[0].position.set(0, 2 * radius, 0);
+			lights[1].position.set(2 * radius, - 2 * radius, 2 * radius);
+			lights[2].position.set(- 2 * radius, - 2 * radius, - 2 * radius);
+
+			scene.add(lights[0]);
+			scene.add(lights[1]);
+			scene.add(lights[2]);
+
+			//
+			scene.add(new THREE.AxesHelper(radius * 5));
+
+			//
+			var ballGeom = newGeometry();
+
+			var ballMesh = new THREE.Mesh(ballGeom, meshMaterial);
+			var ballLineSegments = new THREE.LineSegments(ballGeom, lineMaterial);
+			ballLineSegments.visible = data.wireframe;
+
+			scene.add(ballLineSegments);
+			scene.add(ballMesh);
+
+			//
+
+			gui = new GUI();
+			gui.width = 350;
+
+			function newGeometry() {
+				var geom = new THREE.IcosahedronBufferGeometry(radius, detail);
+				// var geom = new THREE.CylinderBufferGeometry( 5, 5, 20, 32 );
+				// var geom = new THREE.OctahedronBufferGeometry( radius, detail );
+				// var geom = new THREE.BoxBufferGeometry(radius, radius, radius, detail, detail, detail);
+
+				// for (let i = 0; i < geom.attributes.uv.array.length; i += 2) {
+				// 	if (i % 13 == 0){
+				// 		geom.attributes.uv.array[i] = geom.attributes.uv.array[i] * uvScale[i];
+				// 	}
+				// }
+
+				return geom;
+			}
+
+			function generateGeometry() {
+
+				updateGroupGeometry(
+					ballMesh,
+					ballLineSegments,
+					newGeometry(),
+					data);
+			}
+
+			function updateLineSegments() {
+				ballLineSegments.visible = data.wireframe;
+			}
+
+			var folder = gui.addFolder('THREE.IcosahedronBufferGeometry');
+			folder.open();
+			folder.add(data, 'wireframe', false).onChange(updateLineSegments);
+			folder.add(data, 'defaultEncodeNormal', false).onChange(generateGeometry);
+			folder.add(data, 'anglesEncodeNormal', false).onChange(generateGeometry);
+			folder.add(data, 'octEncodeNormal', false).onChange(generateGeometry);
+			folder.add(data, 'quantizeEncodePos', false).onChange(generateGeometry);
+			folder.add(data, 'defaultEncodeUV', false).onChange(generateGeometry);
+			folder.add(data, 'lightsRotation', 0, 10, 1);
+			memoryDisplay = folder.add(data, 'totalGPUMemory', "0 bytes");
+			computeGPUMemory(ballMesh);
+
+			//
+
+			if (statsEnabled) {
+
+				stats = new Stats();
+				container.appendChild(stats.dom);
+
+			}
+
+			window.addEventListener('resize', onWindowResize, false);
+
+		}
+
+		//
+
+		function onWindowResize() {
+
+			renderer.setSize(window.innerWidth, window.innerHeight);
+
+			camera.aspect = window.innerWidth / window.innerHeight;
+			camera.updateProjectionMatrix();
+
+		}
+
+		//
+		function updateLightsPossition() {
+			lights.forEach(light => {
+				var direction = light.position.clone();
+				direction.applyAxisAngle(new THREE.Vector3(1, 1, 0), data.lightsRotation / 180 * Math.PI);
+				light.position.add(direction.sub(light.position));
+			});
+		}
+
+		//
+
+		function animate() {
+
+			requestAnimationFrame(animate);
+
+			controls.update();
+			updateLightsPossition();
+
+			renderer.render(scene, camera);
+
+			if (statsEnabled) stats.update();
+
+		}
+
+		//
+
+		function updateGroupGeometry(mesh, lineSegments, geometry, data) {
+
+			if (geometry.isGeometry) {
+
+				geometry = new THREE.BufferGeometry().fromGeometry(geometry);
+
+				console.warn('THREE.GeometryBrowser: Converted Geometry to BufferGeometry.');
+
+			}
+
+			lineSegments.geometry.dispose();
+			mesh.geometry.dispose();
+
+			lineSegments.geometry = new THREE.WireframeGeometry(geometry);
+			mesh.geometry = geometry;
+			mesh.material = meshMaterial;
+
+			var method = "";
+			if (data.anglesEncodeNormal) {
+				method = "ANGLES";
+			} else if (data.octEncodeNormal) {
+				method = "OCT";
+			} else if (data.defaultEncodeNormal) {
+				method = "DEFAULT";
+			}
+
+			if (method != "") {
+				GeometryCompressionUtils.compressNormals(mesh, method);
+			}
+
+			if (data.quantizeEncodePos) {
+				GeometryCompressionUtils.compressPositions(mesh);
+			}
+
+			if (data.defaultEncodeUV) {
+				GeometryCompressionUtils.compressUvs(mesh);
+			}
+
+			computeGPUMemory(mesh);
+
+		}
+
+
+		function computeGPUMemory(mesh) {
+			let posBytes = mesh.geometry.attributes.position.bytes || mesh.geometry.attributes.position.array.length * 4;
+			let normBytes = mesh.geometry.attributes.normal.bytes || mesh.geometry.attributes.normal.array.length * 4;
+			let uvBytes = mesh.geometry.attributes.uv.bytes || mesh.geometry.attributes.uv.array.length * 4;
+			memoryDisplay.setValue(posBytes + normBytes + uvBytes + " bytes");
+		}
+
+
+
+
+	</script>
+
+</body>
+
+</html>

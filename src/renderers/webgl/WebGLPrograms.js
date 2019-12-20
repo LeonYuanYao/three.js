@@ -2,7 +2,7 @@
  * @author mrdoob / http://mrdoob.com/
  */
 
-import { BackSide, DoubleSide, CubeUVRefractionMapping, CubeUVReflectionMapping, GammaEncoding, LinearEncoding, ObjectSpaceNormalMap, TangentSpaceNormalMap, NoToneMapping } from '../../constants.js';
+import { BackSide, DoubleSide, CubeUVRefractionMapping, CubeUVReflectionMapping, LinearEncoding, ObjectSpaceNormalMap, TangentSpaceNormalMap, NoToneMapping } from '../../constants.js';
 import { WebGLProgram } from './WebGLProgram.js';
 
 function WebGLPrograms( renderer, extensions, capabilities ) {
@@ -23,7 +23,7 @@ function WebGLPrograms( renderer, extensions, capabilities ) {
 		MeshBasicMaterial: 'basic',
 		MeshLambertMaterial: 'lambert',
 		MeshPhongMaterial: 'phong',
-		MeshToonMaterial: 'phong',
+		MeshToonMaterial: 'toon',
 		MeshStandardMaterial: 'physical',
 		MeshPhysicalMaterial: 'physical',
 		MeshMatcapMaterial: 'matcap',
@@ -37,9 +37,9 @@ function WebGLPrograms( renderer, extensions, capabilities ) {
 	var parameterNames = [
 		"precision", "isWebGL2", "supportsVertexTextures", "outputEncoding", "instancing", "numMultiviewViews",
 		"map", "mapEncoding", "matcap", "matcapEncoding", "envMap", "envMapMode", "envMapEncoding", "envMapCubeUV",
-		"lightMap", "aoMap", "emissiveMap", "emissiveMapEncoding", "bumpMap", "normalMap", "objectSpaceNormalMap", "tangentSpaceNormalMap", "clearcoatNormalMap", "displacementMap", "specularMap",
+		"lightMap", "lightMapEncoding", "aoMap", "emissiveMap", "emissiveMapEncoding", "bumpMap", "normalMap", "objectSpaceNormalMap", "tangentSpaceNormalMap", "clearcoatNormalMap", "displacementMap", "specularMap",
 		"roughnessMap", "metalnessMap", "gradientMap",
-		"alphaMap", "combine", "vertexColors", "vertexTangents", "vertexUvs", "fog", "useFog", "fogExp2",
+		"alphaMap", "combine", "vertexColors", "vertexTangents", "vertexUvs", "uvsVertexOnly", "fog", "useFog", "fogExp2",
 		"flatShading", "sizeAttenuation", "logarithmicDepthBuffer", "skinning",
 		"maxBones", "useVertexTexture", "morphTargets", "morphNormals",
 		"maxMorphTargets", "maxMorphNormals", "premultipliedAlpha",
@@ -87,7 +87,7 @@ function WebGLPrograms( renderer, extensions, capabilities ) {
 
 	}
 
-	function getTextureEncodingFromMap( map, gammaOverrideLinear ) {
+	function getTextureEncodingFromMap( map ) {
 
 		var encoding;
 
@@ -103,13 +103,6 @@ function WebGLPrograms( renderer, extensions, capabilities ) {
 
 			console.warn( "THREE.WebGLPrograms.getTextureEncodingFromMap: don't use render targets as textures. Use their .texture property instead." );
 			encoding = map.texture.encoding;
-
-		}
-
-		// add backwards compatibility for WebGLRenderer.gammaInput/gammaOutput parameter, should probably be removed at some point.
-		if ( encoding === LinearEncoding && gammaOverrideLinear ) {
-
-			encoding = GammaEncoding;
 
 		}
 
@@ -153,19 +146,20 @@ function WebGLPrograms( renderer, extensions, capabilities ) {
 
 			supportsVertexTextures: vertexTextures,
 			numMultiviewViews: numMultiviewViews,
-			outputEncoding: getTextureEncodingFromMap( ( ! currentRenderTarget ) ? null : currentRenderTarget.texture, renderer.gammaOutput ),
+			outputEncoding: ( currentRenderTarget !== null ) ? getTextureEncodingFromMap( currentRenderTarget.texture ) : renderer.outputEncoding,
 			map: !! material.map,
-			mapEncoding: getTextureEncodingFromMap( material.map, renderer.gammaInput ),
+			mapEncoding: getTextureEncodingFromMap( material.map ),
 			matcap: !! material.matcap,
-			matcapEncoding: getTextureEncodingFromMap( material.matcap, renderer.gammaInput ),
+			matcapEncoding: getTextureEncodingFromMap( material.matcap ),
 			envMap: !! material.envMap,
 			envMapMode: material.envMap && material.envMap.mapping,
-			envMapEncoding: getTextureEncodingFromMap( material.envMap, renderer.gammaInput ),
+			envMapEncoding: getTextureEncodingFromMap( material.envMap ),
 			envMapCubeUV: ( !! material.envMap ) && ( ( material.envMap.mapping === CubeUVReflectionMapping ) || ( material.envMap.mapping === CubeUVRefractionMapping ) ),
 			lightMap: !! material.lightMap,
+			lightMapEncoding: getTextureEncodingFromMap( material.lightMap ),
 			aoMap: !! material.aoMap,
 			emissiveMap: !! material.emissiveMap,
-			emissiveMapEncoding: getTextureEncodingFromMap( material.emissiveMap, renderer.gammaInput ),
+			emissiveMapEncoding: getTextureEncodingFromMap( material.emissiveMap ),
 			bumpMap: !! material.bumpMap,
 			normalMap: !! material.normalMap,
 			objectSpaceNormalMap: material.normalMapType === ObjectSpaceNormalMap,
@@ -185,7 +179,8 @@ function WebGLPrograms( renderer, extensions, capabilities ) {
 
 			vertexTangents: ( material.normalMap && material.vertexTangents ),
 			vertexColors: material.vertexColors,
-			vertexUvs: !! material.map || !! material.bumpMap || !! material.normalMap || !! material.specularMap || !! material.alphaMap || !! material.emissiveMap || !! material.roughnessMap || !! material.metalnessMap || !! material.clearcoatNormalMap,
+			vertexUvs: !! material.map || !! material.bumpMap || !! material.normalMap || !! material.specularMap || !! material.alphaMap || !! material.emissiveMap || !! material.roughnessMap || !! material.metalnessMap || !! material.clearcoatNormalMap || !! material.displacementMap,
+			uvsVertexOnly: ! ( !! material.map || !! material.bumpMap || !! material.normalMap || !! material.specularMap || !! material.alphaMap || !! material.emissiveMap || !! material.roughnessMap || !! material.metalnessMap || !! material.clearcoatNormalMap ) && !! material.displacementMap,
 
 			fog: !! fog,
 			useFog: material.fog,
@@ -240,7 +235,7 @@ function WebGLPrograms( renderer, extensions, capabilities ) {
 
 	};
 
-	this.getProgramCode = function ( material, parameters ) {
+	this.getProgramCacheKey = function ( material, parameters ) {
 
 		var array = [];
 
@@ -266,34 +261,37 @@ function WebGLPrograms( renderer, extensions, capabilities ) {
 
 		}
 
-		for ( var i = 0; i < parameterNames.length; i ++ ) {
+		if ( material.isRawShaderMaterial === undefined ) {
 
-			array.push( parameters[ parameterNames[ i ] ] );
+			for ( var i = 0; i < parameterNames.length; i ++ ) {
+
+				array.push( parameters[ parameterNames[ i ] ] );
+
+			}
+
+			array.push( renderer.outputEncoding );
+			array.push( renderer.gammaFactor );
 
 		}
 
 		array.push( material.onBeforeCompile.toString() );
 
-		array.push( renderer.gammaOutput );
-
-		array.push( renderer.gammaFactor );
-
 		return array.join();
 
 	};
 
-	this.acquireProgram = function ( material, shader, parameters, code ) {
+	this.acquireProgram = function ( material, shader, parameters, cacheKey ) {
 
 		var program;
 
 		// Check if code has been already compiled
 		for ( var p = 0, pl = programs.length; p < pl; p ++ ) {
 
-			var programInfo = programs[ p ];
+			var preexistingProgram = programs[ p ];
 
-			if ( programInfo.code === code ) {
+			if ( preexistingProgram.cacheKey === cacheKey ) {
 
-				program = programInfo;
+				program = preexistingProgram;
 				++ program.usedTimes;
 
 				break;
@@ -304,7 +302,7 @@ function WebGLPrograms( renderer, extensions, capabilities ) {
 
 		if ( program === undefined ) {
 
-			program = new WebGLProgram( renderer, extensions, code, material, shader, parameters );
+			program = new WebGLProgram( renderer, extensions, cacheKey, material, shader, parameters );
 			programs.push( program );
 
 		}
