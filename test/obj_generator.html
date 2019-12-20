@@ -1,117 +1,173 @@
 <!DOCTYPE html>
 <html lang="en">
-	<head>
-		<title>three.js webgl - OBJLoader + MTLLoader</title>
-		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-		<link type="text/css" rel="stylesheet" href="../examples/main.css">
-	</head>
 
-	<body>
-		<div id="info">
+<head>
+	<title>three.js webgl - OBJLoader + MTLLoader</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<link type="text/css" rel="stylesheet" href="../examples/main.css">
+</head>
+
+<body>
+	<div id="info">
 		<a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> - OBJ Generator
-		</div>
+		<input type="button" id="export" value="ExportOBJ" />
+	</div>
 
-		<script type="module">
+	<script type="module">
 
-			import * as THREE from '../build/three.module.js';
+		import * as THREE from '../build/three.module.js';
 
-			import { DDSLoader } from '../examples/jsm/loaders/DDSLoader.js';
-			import { MTLLoader } from '../examples/jsm/loaders/MTLLoader.js';
-			import { OBJLoader } from '../examples/jsm/loaders/OBJLoader.js';
+		import { DDSLoader } from '../examples/jsm/loaders/DDSLoader.js';
+		import { MTLLoader } from '../examples/jsm/loaders/MTLLoader.js';
+		import { OBJLoader } from '../examples/jsm/loaders/OBJLoader.js';
+		import { OrbitControls } from '../examples/jsm/controls/OrbitControls.js';
+		import { OBJExporter } from '../examples/jsm/exporters/OBJExporter.js';
 
-			var container;
+		var container;
 
-			var camera, scene, renderer;
+		var camera, scene, renderer, controls, group, sceneBox;
 
-			var mouseX = 0, mouseY = 0;
+		var mouseX = 0, mouseY = 0;
 
-			var windowHalfX = window.innerWidth / 2;
-			var windowHalfY = window.innerHeight / 2;
-
-
-			init();
-			animate();
+		var windowHalfX = window.innerWidth / 2;
+		var windowHalfY = window.innerHeight / 2;
 
 
-			function init() {
+		init();
+		animate();
 
-				container = document.createElement( 'div' );
-				document.body.appendChild( container );
 
-				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 2000 );
-				camera.position.z = 250;
+		function init() {
 
-				// scene
+			container = document.createElement('div');
+			document.body.appendChild(container);
 
-				scene = new THREE.Scene();
+			camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 2000);
+			camera.up.set(0, 0, 1);
 
-				var ambientLight = new THREE.AmbientLight( 0xcccccc, 0.4 );
-				scene.add( ambientLight );
+			// scene
 
-				var pointLight = new THREE.PointLight( 0xffffff, 0.8 );
-				camera.add( pointLight );
-				scene.add( camera );
+			scene = new THREE.Scene();
 
-				// model
+			var ambientLight = new THREE.AmbientLight(0xcccccc, 0.4);
+			scene.add(ambientLight);
 
-				
+			var pointLight = new THREE.PointLight(0xffffff, 0.8);
+			camera.add(pointLight);
+			scene.add(camera);
 
-				//
+			var axesHelper = new THREE.AxesHelper(500);
+			scene.add(axesHelper);
 
-				renderer = new THREE.WebGLRenderer();
-				renderer.setPixelRatio( window.devicePixelRatio );
-				renderer.setSize( window.innerWidth, window.innerHeight );
-				container.appendChild( renderer.domElement );
+			group = new THREE.Group();
+			sceneBox = new THREE.Box3();
 
-				document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+			// init model
+			var grids = 5;
+			var length = 10;
 
-				//
-
-				window.addEventListener( 'resize', onWindowResize, false );
-
+			for (let i = 0; i < grids; i++) {
+				for (let j = 0; j < grids; j++) {
+					var geometry = new THREE.BoxGeometry(length, length, length);
+					var material = new THREE.MeshPhongMaterial({ color: 0x156289, emissive: 0x072534, flatShading: true });
+					var mesh = new THREE.Mesh(geometry, material);
+					mesh.position.set(i * length * 1.1, j * length * 1.1, 0);
+					mesh.updateMatrixWorld();
+					geometry.computeBoundingBox();
+					sceneBox.union(geometry.boundingBox.clone().applyMatrix4(mesh.matrix));
+					group.add(mesh);
+				}
 			}
 
-			function onWindowResize() {
 
-				windowHalfX = window.innerWidth / 2;
-				windowHalfY = window.innerHeight / 2;
+			// var geometry = new THREE.BoxGeometry(length, length, length);
+			// var material = new THREE.MeshPhongMaterial({ color: 0x156289, emissive: 0x072534, flatShading: true });
+			// var mesh = new THREE.Mesh(geometry, material);
+			// group.add(mesh);
 
-				camera.aspect = window.innerWidth / window.innerHeight;
-				camera.updateProjectionMatrix();
+			//
 
-				renderer.setSize( window.innerWidth, window.innerHeight );
+			// Export button function
+			var exportBtn = document.getElementById("export");
+			exportBtn.onclick = function () {
+				var exporter = new OBJExporter();
+				var result = exporter.parse(group);
+				result = result.replace(/o \n/g, '');
 
-			}
+				var MIME_TYPE = 'text/plain';
+				window.URL = window.webkitURL || window.URL;
 
-			function onDocumentMouseMove( event ) {
-
-				mouseX = ( event.clientX - windowHalfX ) / 2;
-				mouseY = ( event.clientY - windowHalfY ) / 2;
-
+				var bb = new Blob([result], { type: MIME_TYPE });
+				var a = document.createElement('a');
+				a.download = 'export.obj';
+				a.href = window.URL.createObjectURL(bb);
+				a.textContent = 'Download ready';
+				a.dataset.downloadurl = [MIME_TYPE, a.download, a.href].join(':');
+				a.click();
 			}
 
 			//
 
-			function animate() {
+			renderer = new THREE.WebGLRenderer();
+			renderer.setPixelRatio(window.devicePixelRatio);
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			container.appendChild(renderer.domElement);
 
-				requestAnimationFrame( animate );
-				render();
+			scene.add(group);
 
-			}
+			controls = new OrbitControls(camera, renderer.domElement);
 
-			function render() {
+			var size = new THREE.Vector3();
+			sceneBox.getSize(size);
+			var diameter = Math.max(size.x, size.y, size.z);
+			camera.position.set(diameter, diameter, diameter);
+			camera.lookAt(0, 0, 0);
 
-				camera.position.x += ( mouseX - camera.position.x ) * .05;
-				camera.position.y += ( - mouseY - camera.position.y ) * .05;
+			document.addEventListener('mousemove', onDocumentMouseMove, false);
 
-				camera.lookAt( scene.position );
+			//
 
-				renderer.render( scene, camera );
+			window.addEventListener('resize', onWindowResize, false);
 
-			}
+		}
 
-		</script>
+		function onWindowResize() {
 
-	</body>
+			windowHalfX = window.innerWidth / 2;
+			windowHalfY = window.innerHeight / 2;
+
+			camera.aspect = window.innerWidth / window.innerHeight;
+			camera.updateProjectionMatrix();
+
+			renderer.setSize(window.innerWidth, window.innerHeight);
+
+		}
+
+		function onDocumentMouseMove(event) {
+
+			mouseX = (event.clientX - windowHalfX) / 2;
+			mouseY = (event.clientY - windowHalfY) / 2;
+
+		}
+
+		//
+
+		function animate() {
+
+			requestAnimationFrame(animate);
+			render();
+
+		}
+
+		function render() {
+
+			renderer.render(scene, camera);
+
+		}
+
+	</script>
+
+</body>
+
 </html>
