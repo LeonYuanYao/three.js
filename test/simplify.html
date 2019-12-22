@@ -10,8 +10,10 @@
 
 <body>
 	<div id="info">
-		<a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> - OBJ Generator
+		<a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> - Simplify
 		<input type="button" id="export" value="ExportOBJ" />
+		<input type="button" id="simplify" value="Simplify" />
+		<input type="number" id="segments" style="width: 50px;" value=10 />
 	</div>
 
 	<script type="module">
@@ -23,6 +25,7 @@
 		import { OBJLoader } from '../examples/jsm/loaders/OBJLoader.js';
 		import { OrbitControls } from '../examples/jsm/controls/OrbitControls.js';
 		import { OBJExporter } from '../examples/jsm/exporters/OBJExporter.js';
+		import { GeometrySimplifyUtil } from './GeometrySimplifyUtil.js';
 
 		var container;
 
@@ -43,11 +46,10 @@
 			container = document.createElement('div');
 			document.body.appendChild(container);
 
-			camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 2000);
+			camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 200000);
 			camera.up.set(0, 0, 1);
 
 			// scene
-
 			scene = new THREE.Scene();
 
 			var ambientLight = new THREE.AmbientLight(0xcccccc, 0.6);
@@ -81,27 +83,35 @@
 			// }
 
 
-			// var geometry = new THREE.IcosahedronBufferGeometry(length * 2, 1);
-			// var geometry = new THREE.BoxBufferGeometry(length * 2, length * 2, length * 2);
-			var geometry = new THREE.OctahedronBufferGeometry(length * 2, 0);
+
+			// model
+			var geometry = new THREE.IcosahedronBufferGeometry(length * 2, 3);
 			var material = new THREE.MeshPhongMaterial({ color: 0x156289, emissive: 0x072534, flatShading: true });
 			var mesh = new THREE.Mesh(geometry, material);
-			mesh.updateMatrixWorld();
 			geometry.computeBoundingBox();
 			sceneBox.union(geometry.boundingBox.clone().applyMatrix4(mesh.matrix));
 			group.add(mesh);
 
-			// geometry = new THREE.BoxGeometry(length * 1.5, length * 1.5, length * 1.5);
-			// material = new THREE.MeshPhongMaterial({ color: 0x156289, emissive: 0x072534, flatShading: true });
-			// mesh = new THREE.Mesh(geometry, material);
-			// group.add(mesh);
-
-			// geometry = new THREE.IcosahedronBufferGeometry(length / 2, 4);
-			// material = new THREE.MeshPhongMaterial({ color: 0x156289, emissive: 0x072534, flatShading: true });
-			// mesh = new THREE.Mesh(geometry, material);
-			// group.add(mesh);
-
+			// simplify geometry
+			var simplifyTool = new GeometrySimplifyUtil();
+			var simplifyBtn = document.getElementById("simplify");
+			simplifyBtn.onclick = function () {
+				var segments = parseInt(document.getElementById("segments").value);
+				var newGeom = simplifyTool.simplify(geometry, { segments: segments });
+				let boxgroup = new THREE.Group();
+				// console.log("boxlist.length", simplifyTool.boxlist.length)
+				simplifyTool.boxlist.forEach((box, index) => {
+					boxgroup.add(new THREE.Box3Helper(box, 0xffff00));
+				});
+				// scene.add(boxgroup);
+				mesh = new THREE.Mesh(newGeom, material);
+				group.children[0] = mesh;
+				sceneBox = new THREE.Box3();
+				sceneBox.union(newGeom.boundingBox.clone().applyMatrix4(mesh.matrix));
+			}
 			//
+
+
 
 			// Export button function
 			var exportBtn = document.getElementById("export");
