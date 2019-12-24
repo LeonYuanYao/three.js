@@ -83,7 +83,7 @@
 
 			// var geometry = new THREE.IcosahedronBufferGeometry(length * 2, 1);
 			// var geometry = new THREE.BoxBufferGeometry(length * 2, length * 2, length * 2);
-			var geometry = new THREE.OctahedronBufferGeometry(length * 2, 0);
+			var geometry = new THREE.OctahedronGeometry(length * 2, 2);
 			var material = new THREE.MeshPhongMaterial({ color: 0x156289, emissive: 0x072534, flatShading: true });
 			var mesh = new THREE.Mesh(geometry, material);
 			mesh.updateMatrixWorld();

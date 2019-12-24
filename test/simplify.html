@@ -14,7 +14,6 @@
 		<input type="button" id="export" value="ExportOBJ" />
 		<input type="button" id="simplify" value="Simplify" />
 		<input type="number" id="segments" style="width: 50px;" value=10 />
-		<input type="button" id="grids" value="grids" />
 	</div>
 
 	<script type="module">
@@ -86,31 +85,43 @@
 
 
 			// model
-			var geometry = new THREE.IcosahedronBufferGeometry(length * 2, 3);
-			var material = new THREE.MeshPhongMaterial({ color: 0x156289, emissive: 0x072534, flatShading: true });
+			var geometry = new THREE.IcosahedronBufferGeometry(length * 2, 4);
+			// var geometry = new THREE.CylinderBufferGeometry(length * 2, length * 2, length * 2, 32);
+			var geometry1 = new THREE.IcosahedronGeometry(length * 2, 3);
+			var material = new THREE.MeshPhongMaterial({ color: 0x156289, emissive: 0x072534, flatShading: false });
 			var mesh = new THREE.Mesh(geometry, material);
 			geometry.computeBoundingBox();
 			sceneBox.union(geometry.boundingBox.clone().applyMatrix4(mesh.matrix));
 			group.add(mesh);
 
+			var wireframe = new THREE.WireframeGeometry(geometry);
+			var line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
+			line.scale.set(1.001, 1.001, 1.001);
+			group.add(line);
+
 			// simplify geometry
-			let boxgroup = new THREE.Group();
+			// let boxgroup = new THREE.Group();
 			var simplifyBtn = document.getElementById("simplify");
 			simplifyBtn.onclick = function () {
 				var simplifyTool = new GeometrySimplifyUtil();
 				var segments = parseInt(document.getElementById("segments").value);
 				var newGeom = simplifyTool.simplify(geometry, { segments: segments });
-				
-				// console.log("boxlist.length", simplifyTool.boxlist.length)
-				boxgroup.children.length = 0;
-				simplifyTool.boxlist.forEach((box, index) => {
-					boxgroup.add(new THREE.Box3Helper(box, 0xffff00));
-				});
-				boxgroup.visible = false;
-				scene.add(boxgroup);
+
+				wireframe = new THREE.WireframeGeometry(newGeom);
+				line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial( { color: 0xffffff } ));
+				line.scale.set(1.001, 1.001, 1.001);
+
+				// boxgroup.children.length = 0;
+				// simplifyTool.boxlist.forEach((box, index) => {
+				// 	boxgroup.add(new THREE.Box3Helper(box, 0xffff00));
+				// });
+				// boxgroup.visible = false;
+				// scene.add(boxgroup);
 
 				mesh = new THREE.Mesh(newGeom, material);
 				group.children[0] = mesh;
+				group.children[1] = line;
+				group.children[1].visible = true;
 				sceneBox = new THREE.Box3();
 				sceneBox.union(newGeom.boundingBox.clone().applyMatrix4(mesh.matrix));
 			}
@@ -122,7 +133,7 @@
 			var exportBtn = document.getElementById("export");
 			exportBtn.onclick = function () {
 				var exporter = new OBJExporter();
-				var result = exporter.parse(group);
+				var result = exporter.parse(mesh);
 				result = result.replace(/o \n/g, '');
 
 				var MIME_TYPE = 'text/plain';
@@ -137,11 +148,6 @@
 				a.click();
 			}
 
-			//
-			var showGrids = document.getElementById("grids");
-			showGrids.onclick = function () {
-				boxgroup.visible = !boxgroup.visible;
-			}
 			//
 
 			renderer = new THREE.WebGLRenderer();
