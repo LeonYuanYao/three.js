@@ -12,8 +12,9 @@
 	<div id="info">
 		<a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> - Simplify
 		<input type="button" id="export" value="ExportOBJ" />
+		<input type="button" id="linevisible" value="LineVisible" />
 		<input type="button" id="simplify" value="Simplify" />
-		<input type="number" id="segments" style="width: 50px;" value=10 />
+		<input type="number" id="segments" style="width: 50px;" value=5 />
 	</div>
 
 	<script type="module">
@@ -25,17 +26,18 @@
 		import { OBJLoader } from '../examples/jsm/loaders/OBJLoader.js';
 		import { OrbitControls } from '../examples/jsm/controls/OrbitControls.js';
 		import { OBJExporter } from '../examples/jsm/exporters/OBJExporter.js';
-		import { GeometrySimplifyUtil } from './GeometrySimplifyUtil.js';
+		import { GeometrySimplifier } from './GeometrySimplifier.js';
 
 		var container;
 
-		var camera, scene, renderer, controls, group, sceneBox;
+		var camera, scene, renderer, controls, group, sceneBox, line;
 
 		var mouseX = 0, mouseY = 0;
 
 		var windowHalfX = window.innerWidth / 2;
 		var windowHalfY = window.innerHeight / 2;
 
+		var linevisible = true;
 
 		init();
 		animate();
@@ -83,11 +85,10 @@
 			// }
 
 
-
 			// model
-			var geometry = new THREE.IcosahedronBufferGeometry(length * 2, 4);
+			// var geometry = new THREE.IcosahedronBufferGeometry(length * 2, 4);
 			// var geometry = new THREE.CylinderBufferGeometry(length * 2, length * 2, length * 2, 32);
-			var geometry1 = new THREE.IcosahedronGeometry(length * 2, 3);
+			var geometry = new THREE.IcosahedronGeometry(length * 2, 4);
 			var material = new THREE.MeshPhongMaterial({ color: 0x156289, emissive: 0x072534, flatShading: false });
 			var mesh = new THREE.Mesh(geometry, material);
 			geometry.computeBoundingBox();
@@ -95,39 +96,63 @@
 			group.add(mesh);
 
 			var wireframe = new THREE.WireframeGeometry(geometry);
-			var line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
+			line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
 			line.scale.set(1.001, 1.001, 1.001);
 			group.add(line);
 
+			// cup obj
+			var loader = new OBJLoader();
+			loader.load(
+
+				'models/cup.obj',
+
+				function (obj) {
+					mesh = obj.children[0];
+					geometry = mesh.geometry;
+					mesh.material = material;
+					group.children[0] = mesh;
+
+					wireframe = new THREE.WireframeGeometry(mesh.geometry);
+					line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
+					
+					line.scale.set(1.001, 1.001, 1.001);
+					group.children[1] = line;
+
+					geometry.computeBoundingBox();
+					sceneBox = geometry.boundingBox;
+					camera.position.set(sceneBox.getSize().x * 2, sceneBox.getSize().y * 2, sceneBox.getSize().z * 2);
+				},
+
+				function (xhr) {
+					console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+				},
+
+				function (error) {
+					console.log('An error happened');
+				}
+			);
+
 			// simplify geometry
-			// let boxgroup = new THREE.Group();
 			var simplifyBtn = document.getElementById("simplify");
 			simplifyBtn.onclick = function () {
-				var simplifyTool = new GeometrySimplifyUtil();
+				var simplifier = new GeometrySimplifier();
 				var segments = parseInt(document.getElementById("segments").value);
-				var newGeom = simplifyTool.simplify(geometry, { segments: segments });
+				var newGeom = simplifier.simplify(geometry, { segments: segments });
+
+				console.log(newGeom.faces.length);
 
 				wireframe = new THREE.WireframeGeometry(newGeom);
-				line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial( { color: 0xffffff } ));
+				line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
 				line.scale.set(1.001, 1.001, 1.001);
-
-				// boxgroup.children.length = 0;
-				// simplifyTool.boxlist.forEach((box, index) => {
-				// 	boxgroup.add(new THREE.Box3Helper(box, 0xffff00));
-				// });
-				// boxgroup.visible = false;
-				// scene.add(boxgroup);
 
 				mesh = new THREE.Mesh(newGeom, material);
 				group.children[0] = mesh;
 				group.children[1] = line;
-				group.children[1].visible = true;
 				sceneBox = new THREE.Box3();
 				sceneBox.union(newGeom.boundingBox.clone().applyMatrix4(mesh.matrix));
 			}
 
 			//
-
 
 			// Export button function
 			var exportBtn = document.getElementById("export");
@@ -146,6 +171,14 @@
 				a.textContent = 'Download ready';
 				a.dataset.downloadurl = [MIME_TYPE, a.download, a.href].join(':');
 				a.click();
+			}
+
+
+			//
+
+			var lineVisBtn = document.getElementById("linevisible");
+			lineVisBtn.onclick = function () {
+				linevisible = !linevisible;
 			}
 
 			//
@@ -202,6 +235,8 @@
 		}
 
 		function render() {
+
+			line.visible = linevisible;
 
 			renderer.render(scene, camera);
 
