@@ -12,8 +12,9 @@
 	<div id="info">
 		<a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> - Simplify
 		<input type="button" id="export" value="ExportOBJ" />
-		<input type="button" id="linevisible" value="LineVisible" />
+		<input type="button" id="linevisible" value="Line" />
 		<input type="button" id="simplify" value="Simplify" />
+		<input type="number" id="tolerance" style="width: 50px;" value=1.0 />
 		<input type="number" id="segments" style="width: 50px;" value=5 />
 	</div>
 
@@ -88,7 +89,7 @@
 			// model
 			// var geometry = new THREE.IcosahedronBufferGeometry(length * 2, 4);
 			// var geometry = new THREE.CylinderBufferGeometry(length * 2, length * 2, length * 2, 32);
-			var geometry = new THREE.IcosahedronGeometry(length * 2, 4);
+			var geometry = new THREE.IcosahedronGeometry(length * 2, 2);
 			var material = new THREE.MeshPhongMaterial({ color: 0x156289, emissive: 0x072534, flatShading: false });
 			var mesh = new THREE.Mesh(geometry, material);
 			geometry.computeBoundingBox();
@@ -97,53 +98,62 @@
 
 			var wireframe = new THREE.WireframeGeometry(geometry);
 			line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
-			line.scale.set(1.001, 1.001, 1.001);
+			line.scale.set(1.002, 1.002, 1.002);
 			group.add(line);
 
-			// cup obj
-			var loader = new OBJLoader();
-			loader.load(
+			// obj model
+			// var loader = new OBJLoader();
+			// loader.load(
 
-				'models/cup.obj',
+			// 	// 'models/cup.obj',
+			// 	// 'models/tube.obj', 
+			// 	// 'models/turbo.obj', 
+			// 	'models/tank.obj', 
 
-				function (obj) {
-					mesh = obj.children[0];
-					geometry = mesh.geometry;
-					mesh.material = material;
-					group.children[0] = mesh;
+			// 	function (obj) {
+			// 		mesh = obj.children[0];
+			// 		geometry = mesh.geometry;
+			// 		mesh.material = material;
+			// 		group.children[0] = mesh;
 
-					wireframe = new THREE.WireframeGeometry(mesh.geometry);
-					line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
+			// 		wireframe = new THREE.WireframeGeometry(mesh.geometry);
+			// 		line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
 					
-					line.scale.set(1.001, 1.001, 1.001);
-					group.children[1] = line;
+			// 		line.scale.set(1.001, 1.001, 1.001);
+			// 		group.children[1] = line;
 
-					geometry.computeBoundingBox();
-					sceneBox = geometry.boundingBox;
-					camera.position.set(sceneBox.getSize().x * 2, sceneBox.getSize().y * 2, sceneBox.getSize().z * 2);
-				},
+			// 		geometry.computeBoundingBox();
+			// 		console.log(geometry.boundingBox.getSize())
+			// 		sceneBox = geometry.boundingBox;
+			// 		camera.position.set(sceneBox.getSize().x * 2, sceneBox.getSize().y * 2, sceneBox.getSize().z * 2);
+			// 	},
 
-				function (xhr) {
-					console.log((xhr.loaded / xhr.total * 100) + '% loaded');
-				},
+			// 	function (xhr) {
+			// 		console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+			// 	},
 
-				function (error) {
-					console.log('An error happened');
-				}
-			);
+			// 	function (error) {
+			// 		console.log('An error happened');
+			// 	}
+			// );
 
 			// simplify geometry
 			var simplifyBtn = document.getElementById("simplify");
 			simplifyBtn.onclick = function () {
 				var simplifier = new GeometrySimplifier();
 				var segments = parseInt(document.getElementById("segments").value);
-				var newGeom = simplifier.simplify(geometry, { segments: segments });
+				var tolerance = document.getElementById("tolerance").value;
+				var newGeom = simplifier.simplify(geometry, { 
+					segments: segments, 
+					// tolerance: tolerance, 
+					normalJoinAngle: 75
+				});
 
 				console.log(newGeom.faces.length);
 
 				wireframe = new THREE.WireframeGeometry(newGeom);
 				line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
-				line.scale.set(1.001, 1.001, 1.001);
+				line.scale.set(1.002, 1.002, 1.002);
 
 				mesh = new THREE.Mesh(newGeom, material);
 				group.children[0] = mesh;

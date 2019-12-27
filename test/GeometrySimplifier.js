@@ -6,7 +6,8 @@ var GeometrySimplifier = function () {
     // publics
     this.source = null;
     this.box = new THREE.Box3();
-    this.segments;
+    this.gridSize = null;
+    this.segments = null;
 
     /**
      * Array<[faces]>: index -> vertexIndex
@@ -21,6 +22,9 @@ var GeometrySimplifier = function () {
     this.xcomp = 0;
     this.ycomp = 0;
     this.zcomp = 0;
+    this.xsegs = 0;
+    this.ysegs = 0;
+    this.zsegs = 0;
 
     // privates
     let scope = this;
@@ -89,16 +93,41 @@ var GeometrySimplifier = function () {
     }
 
 
-    function initGridsInfo(segments) {
-        scope.source.computeBoundingBox();
-        scope.box = scope.source.boundingBox.clone();
-
+    function initGridsInfo() {
         scope.gridsmap = new Map();
+        scope.source.computeBoundingBox();
+
         let size = new THREE.Vector3();
-        scope.box.getSize(size);
-        scope.xcomp = size.x / segments;
-        scope.ycomp = size.y / segments;
-        scope.zcomp = size.z / segments;
+        let center = new THREE.Vector3();
+        scope.source.boundingBox.getSize(size);
+        scope.source.boundingBox.getCenter(center);
+
+        scope.box = scope.source.boundingBox.clone();
+        // scope.box = new THREE.Box3().setFromCenterAndSize(center, size);
+
+        if (scope.gridSize) {
+            // use gridSize first
+            scope.xcomp = scope.gridSize;
+            scope.ycomp = scope.gridSize;
+            scope.zcomp = scope.gridSize;
+
+            scope.xsegs = size.x / scope.gridSize;
+            scope.ysegs = size.y / scope.gridSize;
+            scope.zsegs = size.z / scope.gridSize;
+
+        } else if (scope.segments) {
+            // use segments
+            scope.xcomp = size.x / scope.segments;
+            scope.ycomp = size.y / scope.segments;
+            scope.zcomp = size.z / scope.segments;
+
+            scope.xsegs = scope.segments;
+            scope.ysegs = scope.segments;
+            scope.zsegs = scope.segments;
+        }
+
+        scope.box = new THREE.Box3().setFromCenterAndSize(center, size);
+
     }
 
 
@@ -107,9 +136,9 @@ var GeometrySimplifier = function () {
         let y = 0 | ((vertex.y - scope.box.min.y) / scope.ycomp);
         let z = 0 | ((vertex.z - scope.box.min.z) / scope.zcomp);
 
-        if (x == scope.segments) x--;
-        if (y == scope.segments) y--;
-        if (z == scope.segments) z--;
+        if (x >= scope.xsegs) x = scope.xsegs - 1;
+        if (y >= scope.ysegs) y = scope.ysegs - 1;
+        if (z >= scope.zsegs) z = scope.zsegs - 1;
 
         let gridid = `${x}_${y}_${z}`;
         vertex.gridid = gridid;
@@ -163,28 +192,45 @@ var GeometrySimplifier = function () {
                 return;
             }
         }
-        // not found any faces that has similar normal value, add to list new
+        // not found any faces that has similar normal value, add to list as new one
         normDiffArray.push({
-            f: [face], 
-            n: face.normal
+            f: [face],
+            n: face.normal.clone()
         });
     }
 
 
+    function resortNewVertices(newGeom) {
+
+    }
+
+
     this.simplify = function (geometry, params) {
-        this.source = geometry;
-        this.segments = params.segments;
 
-        let newGeom = new THREE.Geometry();
-
-        if (this.segments < 2) {
-            console.error("The segments cannot be smaller than 2");
+        if (params.tolerance <= 0) {
+            console.error("The tolerance must be greater than 0");
             return;
         }
 
+        if (params.tolerance !== undefined) {
+            // tolerance = gridSize * sqrt(3) / 2
+            this.gridSize = Math.max(params.tolerance, 0.01) * 2 / 1.7320508075688772;
+
+        } else if (params.segments !== undefined) {
+            // if no tolerance given, use parameter segments
+            this.segments = Math.max(params.segments, 2);
+        }
+
+        let normalJoinAngle = params.normalJoinAngle || 60;
+        normalDiffThreshold = Math.cos(normalJoinAngle * Math.PI / 180);
+
+        this.source = geometry;
+
+        let newGeom = new THREE.Geometry();
+
         parseGeometry();
 
-        initGridsInfo(this.segments);
+        initGridsInfo();
 
         // determine every vertex's box & check face's degeneration
         for (let i = 0, fl = faces.length; i < fl; i++) {
@@ -219,7 +265,6 @@ var GeometrySimplifier = function () {
         for (let i = 0, al = this.vertFaceArray.length; i < al; i++) {
 
             let faceArr = this.vertFaceArray[i];
-            // checkVertexDegen(faceArr);
 
             let vert = vertices[i];
             let findVertex = newGeom.vertices.find(v => v.gridid == vert.gridid);
@@ -227,8 +272,7 @@ var GeometrySimplifier = function () {
             // if the grid's vertex has been added already, it is not needed to add again
             if (!findVertex) {
                 // vertex not found, needs to add to vertices
-                newGeom.vertices.push(vert);
-                let index = newGeom.vertices.indexOf(vert);
+                let index = newGeom.vertices.push(vert) - 1;
                 // set the new face indices
                 for (let i = 0; i < faceArr.length; i++) {
                     let faceObj = faceArr[i];
@@ -253,46 +297,47 @@ var GeometrySimplifier = function () {
             }
         }
 
-        // newGeom = new THREE.BufferGeometry().fromGeometry(newGeom)
 
         newGeom.computeBoundingBox();
         newGeom.computeFaceNormals();
 
+
+        // to generate smooth normal on mesh, compare each vertex's face's normals
+        // if one vertex has too much difference on face normals, duplicate it in vertices array
         for (let i = 0, vl = newGeom.vertices.length; i < vl; i++) {
             let vertex = newGeom.vertices[i];
-            let faces = newGeom.faces.filter(f => f.a == i || f.b == i || f.c == i);
-            let fl = faces.length;
+            let filteredFaces = newGeom.faces.filter(f => f.a == i || f.b == i || f.c == i);
+            let fl = filteredFaces.length;
             if (fl > 1) {
                 let normDiffs = [{
-                    f: [faces[0]],
-                    n: faces[0].normal
+                    f: [filteredFaces[0]],
+                    n: filteredFaces[0].normal.clone()
                 }];
                 for (let j = 1; j < fl; j++) {
-                    let anotherFace = faces[j];
+                    let anotherFace = filteredFaces[j];
                     compareNormalDiffs(normDiffs, anotherFace);
                 }
                 if (normDiffs.length > 1) {
                     for (let j = 1, l = normDiffs.length; j < l; j++) {
                         let ff = normDiffs[j].f;
+                        // duplicate the vertex in array (insert after this vertex)
                         let newIndex = newGeom.vertices.push(vertex.clone()) - 1;
                         for (let k = 0, ffl = ff.length; k < ffl; k++) {
                             if (ff[k].a == i) ff[k].a = newIndex;
                             if (ff[k].b == i) ff[k].b = newIndex;
                             if (ff[k].c == i) ff[k].c = newIndex;
                         }
+
                     }
                 }
             }
 
         }
 
+        // sort the new vertices, to be gpu-friendly-order
+        resortNewVertices(newGeom);
 
         newGeom.computeVertexNormals();
-
-
-        // console.log(newGeom.faces.length)
-
-
 
         return newGeom;
     }
