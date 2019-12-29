@@ -1,6 +1,9 @@
 import * as THREE from '../build/three.module.js';
 
-
+/**
+ * 
+ *
+ */
 var GeometrySimplifier = function () {
 
     // publics
@@ -28,28 +31,41 @@ var GeometrySimplifier = function () {
 
     // privates
     let scope = this;
-    let faces, vertices, uvs;
+    let faces, vertices, uvsArr, hasUVs;
     let normalDiffThreshold = Math.cos(60 * Math.PI / 180);
 
-
+    /**
+     * parseGeometry
+     *
+     */
     function parseGeometry() {
 
         if (scope.source instanceof THREE.Geometry) {
 
             faces = scope.source.faces.map(face => face.clone());
             vertices = scope.source.vertices.map(vert => vert.clone());
-            uvs = scope.source.faceVertexUvs;
+            uvsArr = scope.source.faceVertexUvs;
+            if (uvsArr.length > 0 && uvsArr[0].length > 0) {
+                hasUVs = true;
+            } else {
+                hasUVs = false;
+            }
 
         } else if (scope.source instanceof THREE.BufferGeometry) {
 
             let source = new THREE.Geometry().fromBufferGeometry(scope.source);
             faces = source.faces.map(face => face.clone());
             vertices = source.vertices.map(vert => vert.clone());
-            uvs = source.faceVertexUvs;
+            uvsArr = source.faceVertexUvs;
+            if (uvsArr.length > 0 && uvsArr[0].length > 0) {
+                hasUVs = true;
+            } else {
+                hasUVs = false;
+            }
 
         } else {
 
-            console.error("The geometry to be simplified is none of 'THREE.Geometry' and 'THREE.BufferGeometry' ");
+            console.error("The geometry to be simplified is neither 'THREE.Geometry' nor 'THREE.BufferGeometry' ");
 
         }
 
@@ -58,6 +74,7 @@ var GeometrySimplifier = function () {
 
             let face = faces[i];
             face.degenerated = false;
+            face.grids = { a: null, b: null, c: null };
 
             var vertFaceRelation = scope.vertFaceArray[face.a];
             if (!vertFaceRelation) {
@@ -93,6 +110,10 @@ var GeometrySimplifier = function () {
     }
 
 
+    /**
+     * initGridsInfo
+     *
+     */
     function initGridsInfo() {
         scope.gridsmap = new Map();
         scope.source.computeBoundingBox();
@@ -130,38 +151,76 @@ var GeometrySimplifier = function () {
 
     }
 
-
-    function computeVertexGrid(vertex) {
+    /**
+     * computeGridid
+     *
+     * @param {*} vertex
+     * @returns
+     */
+    function computeGridid(vertex) {
         let x = 0 | ((vertex.x - scope.box.min.x) / scope.xcomp);
         let y = 0 | ((vertex.y - scope.box.min.y) / scope.ycomp);
         let z = 0 | ((vertex.z - scope.box.min.z) / scope.zcomp);
 
+        // prevent the vertex to be fitted in out-of-box grid (gridid is based on lower bound index)
         if (x >= scope.xsegs) x = scope.xsegs - 1;
         if (y >= scope.ysegs) y = scope.ysegs - 1;
         if (z >= scope.zsegs) z = scope.zsegs - 1;
 
-        let gridid = `${x}_${y}_${z}`;
-        vertex.gridid = gridid;
+        return `${x}_${y}_${z}`;
+    }
 
+
+    /**
+     * computeVertexGrid
+     *
+     * @param {*} vertex
+     * @returns
+     */
+    function computeVertexGrid(vertex) {
+
+        let gridid = computeGridid(vertex);
+
+        vertex.gridid = gridid;
         let grid = scope.gridsmap.get(gridid);
         if (!!grid) {
             grid.vertices.push(vertex);
         } else {
-            scope.gridsmap.set(gridid, {
+            grid = {
                 vertices: [vertex],
                 point: null,
-            });
+                uvs: [],
+                newUVs: []
+            };
+            scope.gridsmap.set(gridid, grid);
         }
         return grid;
     }
 
 
+    function addGridUV(grid, faceIndex, abc) {
+        for (let i = 0, uvl = uvsArr.length; i < uvl; i++) {
+            let uvArr = uvsArr[i]; //[uvs]
+            let faceUV = uvArr[faceIndex]; //[uv0, uv1, uv2]
+            if (!grid.uvs[i]) grid.uvs[i] = [];
+            if (abc == "a") grid.uvs[i].push(faceUV[0]);
+            if (abc == "b") grid.uvs[i].push(faceUV[1]);
+            if (abc == "c") grid.uvs[i].push(faceUV[2]);
+        }
+    }
+
+
+    /**
+     * computeGridAvgPoint
+     *
+     * @param {*} grid
+     */
     function computeGridAvgPoint(grid) {
         let sumx = 0;
         let sumy = 0;
         let sumz = 0;
         let n = grid.vertices.length;
-        for (let i = 0; i < grid.vertices.length; i++) {
+        for (let i = 0; i < n; i++) {
             sumx += grid.vertices[i].x;
             sumy += grid.vertices[i].y;
             sumz += grid.vertices[i].z;
@@ -170,6 +229,27 @@ var GeometrySimplifier = function () {
     }
 
 
+    function computeGridAvgUV(grid) {
+        for (let i = 0, l = grid.uvs.length; i < l; i++) {
+            let uvArr = grid.uvs[i];
+            let sumx = 0;
+            let sumy = 0;
+            let n = uvArr.length;
+            for (let j = 0; j < n; j++) {
+                sumx += uvArr[j].x;
+                sumy += uvArr[j].y;
+            }
+            grid.newUVs[i] = new THREE.Vector2(sumx / n, sumy / n);
+        }
+    }
+
+
+    /**
+     * checkFaceDegen
+     *
+     * @param {*} face
+     * @returns
+     */
     function checkFaceDegen(face) {
         let a = vertices[face.a];
         let b = vertices[face.b];
@@ -181,7 +261,13 @@ var GeometrySimplifier = function () {
         return false;
     }
 
-
+    /**
+     * compareNormalDiffs
+     *
+     * @param {*} normDiffArray
+     * @param {*} face
+     * @returns
+     */
     function compareNormalDiffs(normDiffArray, face) {
         for (let i = 0, l = normDiffArray.length; i < l; i++) {
             let dot = normDiffArray[i].n.dot(face.normal);
@@ -199,10 +285,58 @@ var GeometrySimplifier = function () {
         });
     }
 
+    /**
+     * resortVerticesOrder
+     *
+     * @param {*} newGeom
+     */
+    function resortVerticesOrder(newGeom) {
+        // find first vertex without gridid (duplicated)
+        let dupIndexStart = newGeom.vertices.findIndex(v => v.gridid == undefined);
+        let vl = newGeom.vertices.length;
 
-    function resortNewVertices(newGeom) {
+        for (let i = dupIndexStart; i < vl; i++) {
+
+            let vert = newGeom.vertices[i];
+            // let findOriginFaces = newGeom.faces.find(f => f.a == i || f.b == i || f.c == i);
+
+            let computedGridid = computeGridid(vert);
+            let findOriginIndex = newGeom.vertices.findIndex(v => v.gridid == computedGridid);
+            let newVertIndex = findOriginIndex + 1;
+
+            // set the vertex to new index
+            newGeom.vertices.splice(newVertIndex, 0, vert.clone());
+
+            // remove the original vertex
+            newGeom.vertices.splice(i + 1, 1);
+
+            // set face's index to new value
+            for (let j = 0, fl = newGeom.faces.length; j < fl; j++) {
+                let face = newGeom.faces[j];
+
+                if (face.a == i) {
+                    face.a = newVertIndex;
+                } else if (face.a > findOriginIndex && face.a < i) {
+                    face.a++;
+                }
+
+                if (face.b == i) {
+                    face.b = newVertIndex;
+                } else if (face.b > findOriginIndex && face.b < i) {
+                    face.b++;
+                }
+
+                if (face.c == i) {
+                    face.c = newVertIndex;
+                } else if (face.c > findOriginIndex && face.c < i) {
+                    face.c++;
+                }
+            }
+        }
+
 
     }
+
 
 
     this.simplify = function (geometry, params) {
@@ -237,9 +371,15 @@ var GeometrySimplifier = function () {
             let face = faces[i];
 
             // compute every vertex's box
-            computeVertexGrid(vertices[face.a]);
-            computeVertexGrid(vertices[face.b]);
-            computeVertexGrid(vertices[face.c]);
+            let grid;
+            grid = computeVertexGrid(vertices[face.a]);
+            if (hasUVs) addGridUV(grid, i, "a");
+
+            grid = computeVertexGrid(vertices[face.b]);
+            if (hasUVs) addGridUV(grid, i, "b");
+
+            grid = computeVertexGrid(vertices[face.c]);
+            if (hasUVs) addGridUV(grid, i, "c");
 
             checkFaceDegen(face);
         }
@@ -252,6 +392,9 @@ var GeometrySimplifier = function () {
             if (grid.vertices.length > 0) {
                 if (!grid.point) {
                     computeGridAvgPoint(grid);
+                }
+                if (!grid.uv) {
+                    computeGridAvgUV(grid);
                 }
                 // set rest of the vertices to be the grid's point
                 for (let i = 0; i < grid.vertices.length; i++) {
@@ -277,6 +420,7 @@ var GeometrySimplifier = function () {
                 for (let i = 0; i < faceArr.length; i++) {
                     let faceObj = faceArr[i];
                     faceObj.f[faceObj.i] = index;
+                    faceObj.f.grids[faceObj.i] = vert.gridid;
                 }
             } else {
                 // found same grid's vertex, no need to add vertex, just use the same index
@@ -285,6 +429,7 @@ var GeometrySimplifier = function () {
                 for (let i = 0; i < faceArr.length; i++) {
                     let faceObj = faceArr[i];
                     faceObj.f[faceObj.i] = index;
+                    faceObj.f.grids[faceObj.i] = vert.gridid;
                 }
             }
 
@@ -292,15 +437,22 @@ var GeometrySimplifier = function () {
 
         // add new faces (which are not degenerated)
         for (let i = 0, fl = faces.length; i < fl; i++) {
-            if (!faces[i].degenerated) {
-                newGeom.faces.push(faces[i]);
+            let face = faces[i];
+            if (!face.degenerated) {
+                newGeom.faces.push(face);
+                // set new uvs
+                if (hasUVs) {
+                    for (let j = 0, uvl = uvsArr.length; j < uvl; j++) {
+                        let uv0 = this.gridsmap.get(face.grids.a).newUVs[j];
+                        let uv1 = this.gridsmap.get(face.grids.b).newUVs[j];
+                        let uv2 = this.gridsmap.get(face.grids.c).newUVs[j];
+                        newGeom.faceVertexUvs[j].push([uv0, uv1, uv2]);
+                    }
+                }
             }
         }
 
-
-        newGeom.computeBoundingBox();
         newGeom.computeFaceNormals();
-
 
         // to generate smooth normal on mesh, compare each vertex's face's normals
         // if one vertex has too much difference on face normals, duplicate it in vertices array
@@ -334,9 +486,10 @@ var GeometrySimplifier = function () {
 
         }
 
-        // sort the new vertices, to be gpu-friendly-order
-        resortNewVertices(newGeom);
+        // re-sort the new vertices, to be gpu friendly order. RESULT NOT AS EXPECTED. 
+        // resortVerticesOrder(newGeom);
 
+        newGeom.computeBoundingBox();
         newGeom.computeVertexNormals();
 
         return newGeom;

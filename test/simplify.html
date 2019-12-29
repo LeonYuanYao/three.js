@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-	<title>three.js webgl - OBJLoader + MTLLoader</title>
+	<title>three.js webgl - Geometry Simplify</title>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 	<link type="text/css" rel="stylesheet" href="../examples/main.css">
@@ -89,8 +89,10 @@
 			// model
 			// var geometry = new THREE.IcosahedronBufferGeometry(length * 2, 4);
 			// var geometry = new THREE.CylinderBufferGeometry(length * 2, length * 2, length * 2, 32);
-			var geometry = new THREE.IcosahedronGeometry(length * 2, 2);
+			var geometry = new THREE.IcosahedronGeometry(length * 2, 4);
 			var material = new THREE.MeshPhongMaterial({ color: 0x156289, emissive: 0x072534, flatShading: false });
+			var texture = new THREE.TextureLoader().load( "../examples/textures/uv_grid_opengl.jpg" );
+			material.map = texture;
 			var mesh = new THREE.Mesh(geometry, material);
 			geometry.computeBoundingBox();
 			sceneBox.union(geometry.boundingBox.clone().applyMatrix4(mesh.matrix));
@@ -100,6 +102,7 @@
 			line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
 			line.scale.set(1.002, 1.002, 1.002);
 			group.add(line);
+
 
 			// obj model
 			// var loader = new OBJLoader();
@@ -126,6 +129,7 @@
 			// 		console.log(geometry.boundingBox.getSize())
 			// 		sceneBox = geometry.boundingBox;
 			// 		camera.position.set(sceneBox.getSize().x * 2, sceneBox.getSize().y * 2, sceneBox.getSize().z * 2);
+			// 		camera.lookAt(sceneBox.getCenter(new THREE.Vector3()));
 			// 	},
 
 			// 	function (xhr) {
@@ -136,6 +140,8 @@
 			// 		console.log('An error happened');
 			// 	}
 			// );
+
+
 
 			// simplify geometry
 			var simplifyBtn = document.getElementById("simplify");
@@ -174,10 +180,10 @@
 				var MIME_TYPE = 'text/plain';
 				window.URL = window.webkitURL || window.URL;
 
-				var bb = new Blob([result], { type: MIME_TYPE });
+				var blob = new Blob([result], { type: MIME_TYPE });
 				var a = document.createElement('a');
 				a.download = 'export.obj';
-				a.href = window.URL.createObjectURL(bb);
+				a.href = window.URL.createObjectURL(blob);
 				a.textContent = 'Download ready';
 				a.dataset.downloadurl = [MIME_TYPE, a.download, a.href].join(':');
 				a.click();
@@ -200,13 +206,13 @@
 
 			scene.add(group);
 
-			controls = new OrbitControls(camera, renderer.domElement);
-
 			var size = new THREE.Vector3();
 			sceneBox.getSize(size);
 			var diameter = Math.max(size.x, size.y, size.z);
 			camera.position.set(diameter, diameter, diameter);
 			camera.lookAt(0, 0, 0);
+
+			controls = new OrbitControls(camera, renderer.domElement);
 
 			document.addEventListener('mousemove', onDocumentMouseMove, false);
 
