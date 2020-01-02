@@ -1,9 +1,7 @@
 import * as THREE from '../build/three.module.js';
+// const THREE = require("../build/three");
 
-/**
- * 
- *
- */
+
 var GeometrySimplifier = function () {
 
     // publics
@@ -19,7 +17,7 @@ var GeometrySimplifier = function () {
 
     /**
      * Map<gridid, gridinfo>
-     * eg. gridid: "0_2_1", gridinfo: { vertices: [], point: [] }
+     * eg. gridid: "0_2_1", gridinfo: { vertices: [], point: [], uvs: [], newUVs: [] }
      */
     this.gridsmap = new Map();
     this.xcomp = 0;
@@ -34,39 +32,36 @@ var GeometrySimplifier = function () {
     let faces, vertices, uvsArr, hasUVs;
     let normalDiffThreshold = Math.cos(60 * Math.PI / 180);
 
+
     /**
      * parseGeometry
      *
      */
     function parseGeometry() {
 
+        let source;
         if (scope.source instanceof THREE.Geometry) {
 
-            faces = scope.source.faces.map(face => face.clone());
-            vertices = scope.source.vertices.map(vert => vert.clone());
-            uvsArr = scope.source.faceVertexUvs;
-            if (uvsArr.length > 0 && uvsArr[0].length > 0) {
-                hasUVs = true;
-            } else {
-                hasUVs = false;
-            }
+            source = scope.source;
 
         } else if (scope.source instanceof THREE.BufferGeometry) {
 
-            let source = new THREE.Geometry().fromBufferGeometry(scope.source);
-            faces = source.faces.map(face => face.clone());
-            vertices = source.vertices.map(vert => vert.clone());
-            uvsArr = source.faceVertexUvs;
-            if (uvsArr.length > 0 && uvsArr[0].length > 0) {
-                hasUVs = true;
-            } else {
-                hasUVs = false;
-            }
+            source = new THREE.Geometry().fromBufferGeometry(scope.source);
 
         } else {
 
             console.error("The geometry to be simplified is neither 'THREE.Geometry' nor 'THREE.BufferGeometry' ");
 
+        }
+
+        faces = source.faces.map(face => face.clone());
+        vertices = source.vertices.map(vert => vert.clone());
+        uvsArr = source.faceVertexUvs;
+
+        if (uvsArr.length > 0 && uvsArr[0].length > 0) {
+            hasUVs = true;
+        } else {
+            hasUVs = false;
         }
 
         scope.vertFaceArray = new Array(vertices.length);
@@ -151,6 +146,7 @@ var GeometrySimplifier = function () {
 
     }
 
+
     /**
      * computeGridid
      *
@@ -158,14 +154,18 @@ var GeometrySimplifier = function () {
      * @returns
      */
     function computeGridid(vertex) {
-        let x = 0 | ((vertex.x - scope.box.min.x) / scope.xcomp);
-        let y = 0 | ((vertex.y - scope.box.min.y) / scope.ycomp);
-        let z = 0 | ((vertex.z - scope.box.min.z) / scope.zcomp);
+        let x = Math.round((vertex.x - scope.box.min.x) / scope.xcomp);
+        let y = Math.round((vertex.y - scope.box.min.y) / scope.ycomp);
+        let z = Math.round((vertex.z - scope.box.min.z) / scope.zcomp);
 
         // prevent the vertex to be fitted in out-of-box grid (gridid is based on lower bound index)
-        if (x >= scope.xsegs) x = scope.xsegs - 1;
-        if (y >= scope.ysegs) y = scope.ysegs - 1;
-        if (z >= scope.zsegs) z = scope.zsegs - 1;
+        // if (x >= scope.xsegs) x = scope.xsegs - 1;
+        // if (y >= scope.ysegs) y = scope.ysegs - 1;
+        // if (z >= scope.zsegs) z = scope.zsegs - 1;
+
+        // if (x <= 0) x = - 1;
+        // if (y <= 0) y = - 1;
+        // if (z <= 0) z = - 1;
 
         return `${x}_${y}_${z}`;
     }
@@ -198,6 +198,13 @@ var GeometrySimplifier = function () {
     }
 
 
+    /**
+     * addGridUV
+     *
+     * @param {*} grid
+     * @param {*} faceIndex
+     * @param {*} abc
+     */
     function addGridUV(grid, faceIndex, abc) {
         for (let i = 0, uvl = uvsArr.length; i < uvl; i++) {
             let uvArr = uvsArr[i]; //[uvs]
@@ -228,7 +235,11 @@ var GeometrySimplifier = function () {
         grid.point = new THREE.Vector3(sumx / n, sumy / n, sumz / n);
     }
 
-
+    /**
+     * computeGridAvgUV
+     *
+     * @param {*} grid
+     */
     function computeGridAvgUV(grid) {
         for (let i = 0, l = grid.uvs.length; i < l; i++) {
             let uvArr = grid.uvs[i];
@@ -240,6 +251,21 @@ var GeometrySimplifier = function () {
                 sumy += uvArr[j].y;
             }
             grid.newUVs[i] = new THREE.Vector2(sumx / n, sumy / n);
+        }
+    }
+
+
+    function computeGridMaxUV(grid) {
+        for (let i = 0, l = grid.uvs.length; i < l; i++) {
+            let uvArr = grid.uvs[i];
+            let maxx = 0;
+            let maxy = 0;
+            let n = uvArr.length;
+            for (let j = 0; j < n; j++) {
+                maxx = Math.max(uvArr[j].x, maxx);
+                maxy = Math.max(uvArr[j].y, maxy);
+            }
+            grid.newUVs[i] = new THREE.Vector2(maxx, maxy);
         }
     }
 
@@ -334,26 +360,32 @@ var GeometrySimplifier = function () {
             }
         }
 
-
     }
 
 
-
+    /**
+     * simplify(geometry, params) : THREE.Geometry
+     *
+     * @param {THREE.Geometry / THREE.BufferGeometry} geometry
+     * @param {Object} params { segments: int(2, ~), errorThreshold: float(0, ~), normalJoinAngle: float(0-180) }
+     * 
+     * @returns {THREE.Geometry}
+     */
     this.simplify = function (geometry, params) {
 
-        if (params.tolerance <= 0) {
-            console.error("The tolerance must be greater than 0");
+        if (params.errorThreshold <= 0) {
+            console.error("The errorThreshold must be greater than 0");
             return;
         }
 
-        if (params.tolerance !== undefined) {
-            // tolerance = gridSize * sqrt(3) / 2
-            this.gridSize = Math.max(params.tolerance, 0.01) * 2 / 1.7320508075688772;
-
-        } else if (params.segments !== undefined) {
-            // if no tolerance given, use parameter segments
+        if (params.segments !== undefined) {
+            // if no errorThreshold given, use parameter segments
             this.segments = Math.max(params.segments, 2);
+        } else if (params.errorThreshold !== undefined) {
+            // errorThreshold = gridSize * sqrt(3) / 2
+            this.gridSize = Math.max(params.errorThreshold, 0.001) * 2 / 1.7320508075688772;
         }
+
 
         let normalJoinAngle = params.normalJoinAngle || 60;
         normalDiffThreshold = Math.cos(normalJoinAngle * Math.PI / 180);
@@ -395,6 +427,7 @@ var GeometrySimplifier = function () {
                 }
                 if (!grid.uv) {
                     computeGridAvgUV(grid);
+                    // computeGridMaxUV(grid);
                 }
                 // set rest of the vertices to be the grid's point
                 for (let i = 0; i < grid.vertices.length; i++) {

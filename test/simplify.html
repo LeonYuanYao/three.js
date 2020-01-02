@@ -14,7 +14,7 @@
 		<input type="button" id="export" value="ExportOBJ" />
 		<input type="button" id="linevisible" value="Line" />
 		<input type="button" id="simplify" value="Simplify" />
-		<input type="number" id="tolerance" style="width: 50px;" value=1.0 />
+		<input type="number" id="errorThreshold" style="width: 50px;" value=1.0 />
 		<input type="number" id="segments" style="width: 50px;" value=5 />
 	</div>
 
@@ -27,7 +27,7 @@
 		import { OBJLoader } from '../examples/jsm/loaders/OBJLoader.js';
 		import { OrbitControls } from '../examples/jsm/controls/OrbitControls.js';
 		import { OBJExporter } from '../examples/jsm/exporters/OBJExporter.js';
-		import { GeometrySimplifier } from './GeometrySimplifier.js';
+		import { GeometrySimplifier } from '../node_bin_yy/GeometrySimplifier.js';
 
 		var container;
 
@@ -89,13 +89,15 @@
 			// model
 			// var geometry = new THREE.IcosahedronBufferGeometry(length * 2, 4);
 			// var geometry = new THREE.CylinderBufferGeometry(length * 2, length * 2, length * 2, 32);
-			var geometry = new THREE.IcosahedronGeometry(length * 2, 4);
-			var material = new THREE.MeshPhongMaterial({ color: 0x156289, emissive: 0x072534, flatShading: false });
-			var texture = new THREE.TextureLoader().load( "../examples/textures/uv_grid_opengl.jpg" );
-			material.map = texture;
+			var geometry = new THREE.IcosahedronGeometry(length * 2, 3);
+			// var material = new THREE.MeshPhongMaterial({ color: 0x156289, emissive: 0x072534, flatShading: false });
+			var material = new THREE.MeshPhongMaterial({ color: 0x156289, flatShading: false });
+			var texture = new THREE.TextureLoader().load("../examples/textures/uv_grid_opengl.jpg");
+			// material.map = texture;
 			var mesh = new THREE.Mesh(geometry, material);
 			geometry.computeBoundingBox();
 			sceneBox.union(geometry.boundingBox.clone().applyMatrix4(mesh.matrix));
+			console.log(sceneBox)
 			group.add(mesh);
 
 			var wireframe = new THREE.WireframeGeometry(geometry);
@@ -105,13 +107,46 @@
 
 
 			// obj model
+			new MTLLoader()
+				.setPath('./models/')
+				.load('chair.mtl', function (materials) {
+
+					materials.preload();
+
+					new OBJLoader()
+						.setMaterials(materials)
+						.setPath('./models/')
+						.load('cup.obj', function (obj) {
+
+							mesh = obj.children[0];
+							geometry = mesh.geometry;
+							// mesh.material = material;
+							group.children[0] = mesh;
+
+							wireframe = new THREE.WireframeGeometry(mesh.geometry);
+							line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
+
+							line.scale.set(1.001, 1.001, 1.001);
+							group.children[1] = line;
+
+							geometry.computeBoundingBox();
+							console.log(geometry.boundingBox.getSize())
+							sceneBox = geometry.boundingBox;
+							camera.position.set(sceneBox.getSize().x * 2, sceneBox.getSize().y * 2, sceneBox.getSize().z * 2);
+							camera.lookAt(sceneBox.getCenter(new THREE.Vector3()));
+
+						});
+
+				});
+
 			// var loader = new OBJLoader();
 			// loader.load(
 
-			// 	// 'models/cup.obj',
+			// 	// 'models/cup_1.obj',
 			// 	// 'models/tube.obj', 
 			// 	// 'models/turbo.obj', 
-			// 	'models/tank.obj', 
+			// 	// 'models/tank.obj', 
+			// 	'models/turnstile.obj', 
 
 			// 	function (obj) {
 			// 		mesh = obj.children[0];
@@ -121,7 +156,7 @@
 
 			// 		wireframe = new THREE.WireframeGeometry(mesh.geometry);
 			// 		line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
-					
+
 			// 		line.scale.set(1.001, 1.001, 1.001);
 			// 		group.children[1] = line;
 
@@ -148,10 +183,10 @@
 			simplifyBtn.onclick = function () {
 				var simplifier = new GeometrySimplifier();
 				var segments = parseInt(document.getElementById("segments").value);
-				var tolerance = document.getElementById("tolerance").value;
-				var newGeom = simplifier.simplify(geometry, { 
-					segments: segments, 
-					// tolerance: tolerance, 
+				var errorThreshold = document.getElementById("errorThreshold").value;
+				var newGeom = simplifier.simplify(geometry, {
+					segments: segments,
+					// errorThreshold: errorThreshold, 
 					normalJoinAngle: 75
 				});
 
@@ -161,7 +196,8 @@
 				line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
 				line.scale.set(1.002, 1.002, 1.002);
 
-				mesh = new THREE.Mesh(newGeom, material);
+				// mesh = new THREE.Mesh(newGeom, material);
+				mesh.geometry = new THREE.BufferGeometry().fromGeometry(newGeom);
 				group.children[0] = mesh;
 				group.children[1] = line;
 				sceneBox = new THREE.Box3();
@@ -173,9 +209,10 @@
 			// Export button function
 			var exportBtn = document.getElementById("export");
 			exportBtn.onclick = function () {
+				mesh.material.forEach((mat, i) => mat.name = i.toString());
 				var exporter = new OBJExporter();
 				var result = exporter.parse(mesh);
-				result = result.replace(/o \n/g, '');
+				// result = result.replace(/o \n/g, '');
 
 				var MIME_TYPE = 'text/plain';
 				window.URL = window.webkitURL || window.URL;
