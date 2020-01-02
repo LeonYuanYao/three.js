@@ -27,7 +27,7 @@
 		import { OBJLoader } from '../examples/jsm/loaders/OBJLoader.js';
 		import { OrbitControls } from '../examples/jsm/controls/OrbitControls.js';
 		import { OBJExporter } from '../examples/jsm/exporters/OBJExporter.js';
-		import { GeometrySimplifier } from '../node_bin_yy/GeometrySimplifier.js';
+		import { DefaultSimplifier, QuadricSimplifier } from '../node_bin_yy/GeometrySimplifier.js';
 
 		var container;
 
@@ -107,81 +107,47 @@
 
 
 			// obj model
-			new MTLLoader()
-				.setPath('./models/')
-				.load('chair.mtl', function (materials) {
+			// new MTLLoader()
+			// 	.setPath('./models/')
+			// 	.load('chair.mtl', function (materials) {
 
-					materials.preload();
+			// 		materials.preload();
 
-					new OBJLoader()
-						.setMaterials(materials)
-						.setPath('./models/')
-						.load('cup.obj', function (obj) {
+			// 		new OBJLoader()
+			// 			.setMaterials(materials)
+			// 			.setPath('./models/')
+			// 			.load('ground.obj', function (obj) {
 
-							mesh = obj.children[0];
-							geometry = mesh.geometry;
-							// mesh.material = material;
-							group.children[0] = mesh;
+			// 				mesh = obj.children[0];
+			// 				geometry = mesh.geometry;
+			// 				// mesh.material = material;
+			// 				if (mesh.material.color.r == 1 && mesh.material.color.g == 1 && mesh.material.color.b == 1)
+			// 					mesh.material = material;
 
-							wireframe = new THREE.WireframeGeometry(mesh.geometry);
-							line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
+			// 				group.children[0] = mesh;
 
-							line.scale.set(1.001, 1.001, 1.001);
-							group.children[1] = line;
+			// 				wireframe = new THREE.WireframeGeometry(mesh.geometry);
+			// 				line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
 
-							geometry.computeBoundingBox();
-							console.log(geometry.boundingBox.getSize())
-							sceneBox = geometry.boundingBox;
-							camera.position.set(sceneBox.getSize().x * 2, sceneBox.getSize().y * 2, sceneBox.getSize().z * 2);
-							camera.lookAt(sceneBox.getCenter(new THREE.Vector3()));
+			// 				line.scale.set(1.001, 1.001, 1.001);
+			// 				group.children[1] = line;
 
-						});
+			// 				geometry.computeBoundingBox();
+			// 				console.log(geometry.boundingBox.getSize())
+			// 				sceneBox = geometry.boundingBox;
+			// 				camera.position.set(sceneBox.getSize().x * 2, sceneBox.getSize().y * 2, sceneBox.getSize().z * 2);
+			// 				camera.lookAt(sceneBox.getCenter(new THREE.Vector3()));
 
-				});
+			// 			});
 
-			// var loader = new OBJLoader();
-			// loader.load(
-
-			// 	// 'models/cup_1.obj',
-			// 	// 'models/tube.obj', 
-			// 	// 'models/turbo.obj', 
-			// 	// 'models/tank.obj', 
-			// 	'models/turnstile.obj', 
-
-			// 	function (obj) {
-			// 		mesh = obj.children[0];
-			// 		geometry = mesh.geometry;
-			// 		mesh.material = material;
-			// 		group.children[0] = mesh;
-
-			// 		wireframe = new THREE.WireframeGeometry(mesh.geometry);
-			// 		line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
-
-			// 		line.scale.set(1.001, 1.001, 1.001);
-			// 		group.children[1] = line;
-
-			// 		geometry.computeBoundingBox();
-			// 		console.log(geometry.boundingBox.getSize())
-			// 		sceneBox = geometry.boundingBox;
-			// 		camera.position.set(sceneBox.getSize().x * 2, sceneBox.getSize().y * 2, sceneBox.getSize().z * 2);
-			// 		camera.lookAt(sceneBox.getCenter(new THREE.Vector3()));
-			// 	},
-
-			// 	function (xhr) {
-			// 		console.log((xhr.loaded / xhr.total * 100) + '% loaded');
-			// 	},
-
-			// 	function (error) {
-			// 		console.log('An error happened');
-			// 	}
-			// );
+			// 	});
 
 
 
 			// simplify geometry
 			var simplifyBtn = document.getElementById("simplify");
 			simplifyBtn.onclick = function () {
-				var simplifier = new GeometrySimplifier();
+				var simplifier = new DefaultSimplifier();
 				var segments = parseInt(document.getElementById("segments").value);
 				var errorThreshold = document.getElementById("errorThreshold").value;
 				var newGeom = simplifier.simplify(geometry, {

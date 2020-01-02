@@ -2,7 +2,11 @@ import * as THREE from '../build/three.module.js';
 // const THREE = require("../build/three");
 
 
-var GeometrySimplifier = function () {
+/**
+ * @constructor
+ * 
+ */
+var DefaultSimplifier = function () {
 
     // publics
     this.source = null;
@@ -10,24 +14,19 @@ var GeometrySimplifier = function () {
     this.gridSize = null;
     this.segments = null;
 
-    /**
-     * Array<[faces]>: index -> vertexIndex
-     */
-    this.vertFaceArray = [];
-
-    /**
-     * Map<gridid, gridinfo>
-     * eg. gridid: "0_2_1", gridinfo: { vertices: [], point: [], uvs: [], newUVs: [] }
-     */
-    this.gridsmap = new Map();
-    this.xcomp = 0;
-    this.ycomp = 0;
-    this.zcomp = 0;
-    this.xsegs = 0;
-    this.ysegs = 0;
-    this.zsegs = 0;
-
     // privates
+    let vertFaceArray = []; // Array<[faces]>: index -> vertexIndex
+
+    // Map<gridid, gridinfo>
+    // eg. gridid: "0_2_1", gridinfo: { vertices: [], point: [], uvs: [], newUVs: [] }
+    let gridsmap = new Map();
+    let xcomp = 0;
+    let ycomp = 0;
+    let zcomp = 0;
+    let xsegs = 0;
+    let ysegs = 0;
+    let zsegs = 0;
+
     let scope = this;
     let faces, vertices, uvsArr, hasUVs;
     let normalDiffThreshold = Math.cos(60 * Math.PI / 180);
@@ -64,16 +63,16 @@ var GeometrySimplifier = function () {
             hasUVs = false;
         }
 
-        scope.vertFaceArray = new Array(vertices.length);
+        vertFaceArray = new Array(vertices.length);
         for (let i = 0, fl = faces.length; i < fl; i++) {
 
             let face = faces[i];
             face.degenerated = false;
             face.grids = { a: null, b: null, c: null };
 
-            var vertFaceRelation = scope.vertFaceArray[face.a];
+            var vertFaceRelation = vertFaceArray[face.a];
             if (!vertFaceRelation) {
-                scope.vertFaceArray[face.a] = [{
+                vertFaceArray[face.a] = [{
                     f: face,   // the related face
                     i: "a"     // the face index
                 }];
@@ -81,9 +80,9 @@ var GeometrySimplifier = function () {
                 vertFaceRelation.push({ f: face, i: "a" });
             }
 
-            vertFaceRelation = scope.vertFaceArray[face.b];
+            vertFaceRelation = vertFaceArray[face.b];
             if (!vertFaceRelation) {
-                scope.vertFaceArray[face.b] = [{
+                vertFaceArray[face.b] = [{
                     f: face,   // the related face
                     i: "b"     // the face index
                 }];
@@ -91,9 +90,9 @@ var GeometrySimplifier = function () {
                 vertFaceRelation.push({ f: face, i: "b" });
             }
 
-            vertFaceRelation = scope.vertFaceArray[face.c];
+            vertFaceRelation = vertFaceArray[face.c];
             if (!vertFaceRelation) {
-                scope.vertFaceArray[face.c] = [{
+                vertFaceArray[face.c] = [{
                     f: face,   // the related face
                     i: "c"     // the face index
                 }];
@@ -110,7 +109,7 @@ var GeometrySimplifier = function () {
      *
      */
     function initGridsInfo() {
-        scope.gridsmap = new Map();
+        gridsmap = new Map();
         scope.source.computeBoundingBox();
 
         let size = new THREE.Vector3();
@@ -123,23 +122,23 @@ var GeometrySimplifier = function () {
 
         if (scope.gridSize) {
             // use gridSize first
-            scope.xcomp = scope.gridSize;
-            scope.ycomp = scope.gridSize;
-            scope.zcomp = scope.gridSize;
+            xcomp = scope.gridSize;
+            ycomp = scope.gridSize;
+            zcomp = scope.gridSize;
 
-            scope.xsegs = size.x / scope.gridSize;
-            scope.ysegs = size.y / scope.gridSize;
-            scope.zsegs = size.z / scope.gridSize;
+            xsegs = size.x / scope.gridSize;
+            ysegs = size.y / scope.gridSize;
+            zsegs = size.z / scope.gridSize;
 
         } else if (scope.segments) {
             // use segments
-            scope.xcomp = size.x / scope.segments;
-            scope.ycomp = size.y / scope.segments;
-            scope.zcomp = size.z / scope.segments;
+            xcomp = size.x / scope.segments;
+            ycomp = size.y / scope.segments;
+            zcomp = size.z / scope.segments;
 
-            scope.xsegs = scope.segments;
-            scope.ysegs = scope.segments;
-            scope.zsegs = scope.segments;
+            xsegs = scope.segments;
+            ysegs = scope.segments;
+            zsegs = scope.segments;
         }
 
         scope.box = new THREE.Box3().setFromCenterAndSize(center, size);
@@ -154,14 +153,14 @@ var GeometrySimplifier = function () {
      * @returns
      */
     function computeGridid(vertex) {
-        let x = Math.round((vertex.x - scope.box.min.x) / scope.xcomp);
-        let y = Math.round((vertex.y - scope.box.min.y) / scope.ycomp);
-        let z = Math.round((vertex.z - scope.box.min.z) / scope.zcomp);
+        let x = Math.round((vertex.x - scope.box.min.x) / xcomp);
+        let y = Math.round((vertex.y - scope.box.min.y) / ycomp);
+        let z = Math.round((vertex.z - scope.box.min.z) / zcomp);
 
         // prevent the vertex to be fitted in out-of-box grid (gridid is based on lower bound index)
-        // if (x >= scope.xsegs) x = scope.xsegs - 1;
-        // if (y >= scope.ysegs) y = scope.ysegs - 1;
-        // if (z >= scope.zsegs) z = scope.zsegs - 1;
+        // if (x >= xsegs) x = xsegs - 1;
+        // if (y >= ysegs) y = ysegs - 1;
+        // if (z >= zsegs) z = zsegs - 1;
 
         // if (x <= 0) x = - 1;
         // if (y <= 0) y = - 1;
@@ -182,7 +181,7 @@ var GeometrySimplifier = function () {
         let gridid = computeGridid(vertex);
 
         vertex.gridid = gridid;
-        let grid = scope.gridsmap.get(gridid);
+        let grid = gridsmap.get(gridid);
         if (!!grid) {
             grid.vertices.push(vertex);
         } else {
@@ -192,7 +191,7 @@ var GeometrySimplifier = function () {
                 uvs: [],
                 newUVs: []
             };
-            scope.gridsmap.set(gridid, grid);
+            gridsmap.set(gridid, grid);
         }
         return grid;
     }
@@ -420,7 +419,7 @@ var GeometrySimplifier = function () {
         // let validFaces = faces.filter(f => !f.degenerated);
 
         // set every vertex to be the grid-point-value
-        this.gridsmap.forEach((grid) => {
+        gridsmap.forEach((grid) => {
             if (grid.vertices.length > 0) {
                 if (!grid.point) {
                     computeGridAvgPoint(grid);
@@ -438,9 +437,9 @@ var GeometrySimplifier = function () {
 
 
         // filter out the valid vertices & set valid faces new index
-        for (let i = 0, al = this.vertFaceArray.length; i < al; i++) {
+        for (let i = 0, al = vertFaceArray.length; i < al; i++) {
 
-            let faceArr = this.vertFaceArray[i];
+            let faceArr = vertFaceArray[i];
 
             let vert = vertices[i];
             let findVertex = newGeom.vertices.find(v => v.gridid == vert.gridid);
@@ -476,9 +475,9 @@ var GeometrySimplifier = function () {
                 // set new uvs
                 if (hasUVs) {
                     for (let j = 0, uvl = uvsArr.length; j < uvl; j++) {
-                        let uv0 = this.gridsmap.get(face.grids.a).newUVs[j];
-                        let uv1 = this.gridsmap.get(face.grids.b).newUVs[j];
-                        let uv2 = this.gridsmap.get(face.grids.c).newUVs[j];
+                        let uv0 = gridsmap.get(face.grids.a).newUVs[j];
+                        let uv1 = gridsmap.get(face.grids.b).newUVs[j];
+                        let uv2 = gridsmap.get(face.grids.c).newUVs[j];
                         newGeom.faceVertexUvs[j].push([uv0, uv1, uv2]);
                     }
                 }
@@ -531,5 +530,213 @@ var GeometrySimplifier = function () {
 }
 
 
-export { GeometrySimplifier };
+
+/**
+ * @constructor
+ *
+ */
+var QuadricSimplifier = function () {
+
+    // publics
+    this.source = null;
+
+    // privates
+    let faces, vertices, uvsArr, hasUVs;
+    let edgesMap = new Map(); //Map<edge, Object>, Ojbect { vertices, faces }
+    let vertFaceArray = []; //Array<[faces]>: index -> vertexIndex
+    let vertQMatArray = [];
+
+
+    function genEdgeInfo(face, i1, i2, vertices) {
+        let edge1 = [face[i1], face[i2]];
+        let edge2 = [face[i2], face[i1]];
+
+        let getEdge1 = edgesMap.get(edge1);
+        if (!!getEdge1) {
+
+            getEdge1.faces.push(face);
+
+        } else {
+
+            let getEdge2 = edgesMap.get(edge2);
+
+            if (!!getEdge2) {
+
+                getEdge2.faces.push(face);
+
+            } else {
+
+                edgesMap.set(edge1, {
+                    vertices: [vertices[face[i1]], vertices[face[i2]]],
+                    faces: [face]
+                });
+            }
+        }
+    }
+
+
+    function parseGeometry() {
+
+        let source;
+
+        if (scope.source instanceof THREE.Geometry) {
+
+            source = scope.source;
+
+        } else if (scope.source instanceof THREE.BufferGeometry) {
+
+            source = new THREE.Geometry().fromBufferGeometry(scope.source);
+
+        } else {
+
+            console.error("The geometry to be simplified is neither 'THREE.Geometry' nor 'THREE.BufferGeometry' ");
+
+        }
+
+        faces = source.faces.map(face => face.clone());
+        vertices = source.vertices.map(vert => vert.clone());
+        uvsArr = source.faceVertexUvs;
+
+        if (uvsArr.length > 0 && uvsArr[0].length > 0) {
+            hasUVs = true;
+        } else {
+            hasUVs = false;
+        }
+
+        for (let i = 0, fl = faces.length; i < fl; i++) {
+            let face = faces[i];
+            face.degenerated = false;
+
+            genEdgeInfo(face, "a", "b", vertices);
+            genEdgeInfo(face, "a", "c", vertices);
+            genEdgeInfo(face, "b", "c", vertices);
+
+            // generate vertFaceArray info
+            var vertFaceRelation = vertFaceArray[face.a];
+            if (!vertFaceRelation) {
+                vertFaceArray[face.a] = [{
+                    f: face,   // the related face
+                    i: "a"     // the face index
+                }];
+            } else {
+                vertFaceRelation.push({ f: face, i: "a" });
+            }
+
+            vertFaceRelation = vertFaceArray[face.b];
+            if (!vertFaceRelation) {
+                vertFaceArray[face.b] = [{
+                    f: face,   // the related face
+                    i: "b"     // the face index
+                }];
+            } else {
+                vertFaceRelation.push({ f: face, i: "b" });
+            }
+
+            vertFaceRelation = vertFaceArray[face.c];
+            if (!vertFaceRelation) {
+                vertFaceArray[face.c] = [{
+                    f: face,   // the related face
+                    i: "c"     // the face index
+                }];
+            } else {
+                vertFaceRelation.push({ f: face, i: "c" });
+            }
+        }
+
+    }
+
+
+    this.simplify = function (geometry, params) {
+        this.source = geometry;
+
+        parseGeometry();
+
+        // calculate QMatrix for every vertex
+        for (let i = 0, vl = vertFaceArray.length; i < vl; i++) {
+            let faceArr = vertFaceArray[i];
+            let vertQMat;
+            for (let j = 0, fl = faceArr.length; j < fl; j++) {
+                let faceObj = faceArr[j];
+                computeFaceQuadricMat(faceObj.f);
+            }
+
+        }
+
+    }
+
+
+    function QuadricMatrix(a, b, c, d) {
+        // basic 10 elements of Quadric Matrix
+        this.m = [
+            a * a, a * b, a * c, a * d, // 0, 1, 2, 3
+            b * b, b * c, b * d,        //    4, 5, 6
+            c * c, c * d,               //       7, 8
+            d * d                       //          9
+        ];
+        this.matrix = new THREE.Matrix4().set(
+            a * a, a * b, a * c, a * d, 
+            a * b, b * b, b * c, b * d, 
+            a * c, b * c, c * c, c * d, 
+            a * d, b * d, c * d, d * d
+        );
+    }
+    Object.assign(QuadricMatrix.prototype, {
+        add: function (anotherQM) {
+            for (let i = 0; i < 10; i++) {
+                this.m[i] += anotherQM.m[i];
+            }
+            return this;
+        },
+        det: function () {
+            var te = this.m;
+
+            var n11 = te[0], n12 = te[1], n13 = te[2], n14 = te[3];
+            var n21 = te[1], n22 = te[4], n23 = te[5], n24 = te[6];
+            var n31 = te[2], n32 = te[5], n33 = te[7], n34 = te[8];
+            var n41 = te[3], n42 = te[6], n43 = te[8], n44 = te[9];
+
+            return (
+                n41 * (
+                    + n14 * n23 * n32
+                    - n13 * n24 * n32
+                    - n14 * n22 * n33
+                    + n12 * n24 * n33
+                    + n13 * n22 * n34
+                    - n12 * n23 * n34
+                ) +
+                n42 * (
+                    + n11 * n23 * n34
+                    - n11 * n24 * n33
+                    + n14 * n21 * n33
+                    - n13 * n21 * n34
+                    + n13 * n24 * n31
+                    - n14 * n23 * n31
+                ) +
+                n43 * (
+                    + n11 * n24 * n32
+                    - n11 * n22 * n34
+                    - n14 * n21 * n32
+                    + n12 * n21 * n34
+                    + n14 * n22 * n31
+                    - n12 * n24 * n31
+                ) +
+                n44 * (
+                    - n13 * n22 * n31
+                    - n11 * n23 * n32
+                    + n11 * n22 * n33
+                    + n13 * n21 * n32
+                    - n12 * n21 * n33
+                    + n12 * n23 * n31
+                )
+
+            );
+        }
+
+    });
+
+}
+
+
+
+export { DefaultSimplifier, QuadricSimplifier };
 
