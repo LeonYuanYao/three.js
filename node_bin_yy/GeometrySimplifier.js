@@ -234,6 +234,44 @@ var DefaultSimplifier = function () {
         grid.point = new THREE.Vector3(sumx / n, sumy / n, sumz / n);
     }
 
+
+    /**
+     * computeGridQuadricPoint
+     *
+     * @param {*} grid
+     */
+    function computeGridQuadricPoint(grid) {
+        let q = new QuadricMatrix(0, 0, 0, 0);
+        let n = grid.vertices.length;
+        for (let i = 0; i < n; i++) {
+            q.addInPlace(grid.vertices[i].q);
+        }
+        let det = q.det();
+        if (Math.abs(det) < 0.0000000001) {
+            return computeGridAvgPoint(grid);
+        } else {
+
+            let m = new THREE.Matrix4();
+            m.set(
+                q.m[0], q.m[1], q.m[2], q.m[3], 
+                q.m[1], q.m[4], q.m[5], q.m[6], 
+                q.m[2], q.m[5], q.m[7], q.m[8], 
+                // q.m[3], q.m[6], q.m[8], q.m[9]
+                0, 0, 0, 1
+            );
+            m.transpose();
+            try{
+                m = new THREE.Matrix4().getInverse(m, true);
+                let e = m.elements;
+                grid.point = new THREE.Vector3( e[3], e[7], e[11] );
+            } catch (e) {
+                return computeGridAvgPoint(grid);
+            }
+        }
+
+    }
+
+
     /**
      * computeGridAvgUV
      *
@@ -361,6 +399,25 @@ var DefaultSimplifier = function () {
 
     }
 
+    /**
+     * computeQuadricMatrix
+     *
+     * @param {*} vertex
+     * @param {*} face
+     */
+    function computeQuadricMatrix(vertex, face) {
+        let a = vertices[face.a];
+        let b = vertices[face.b];
+        let c = vertices[face.c];
+        let plane = new THREE.Plane().setFromCoplanarPoints(a, b, c);
+        let q = new QuadricMatrix(plane.normal.x, plane.normal.y, plane.normal.z, plane.constant);
+        if (!!vertex.q) {
+            vertex.q.addInPlace(q);
+        } else {
+            vertex.q = q;
+        }
+    }
+
 
     /**
      * simplify(geometry, params) : THREE.Geometry
@@ -402,27 +459,38 @@ var DefaultSimplifier = function () {
             let face = faces[i];
 
             // compute every vertex's box
-            let grid;
-            grid = computeVertexGrid(vertices[face.a]);
+            let vertex, grid;
+
+            vertex = vertices[face.a];
+            computeQuadricMatrix(vertex, face);
+            grid = computeVertexGrid(vertex);
             if (hasUVs) addGridUV(grid, i, "a");
 
-            grid = computeVertexGrid(vertices[face.b]);
+            vertex = vertices[face.b];
+            computeQuadricMatrix(vertex, face);
+            grid = computeVertexGrid(vertex);
             if (hasUVs) addGridUV(grid, i, "b");
 
-            grid = computeVertexGrid(vertices[face.c]);
+            vertex = vertices[face.c];
+            computeQuadricMatrix(vertex, face);
+            grid = computeVertexGrid(vertex);
             if (hasUVs) addGridUV(grid, i, "c");
 
             checkFaceDegen(face);
+
         }
 
         console.log("faces.length", faces.length)
         // let validFaces = faces.filter(f => !f.degenerated);
 
         // set every vertex to be the grid-point-value
-        gridsmap.forEach((grid) => {
+        gridsmap.forEach((grid, id) => {
             if (grid.vertices.length > 0) {
                 if (!grid.point) {
                     computeGridAvgPoint(grid);
+                    console.log(id, grid.point);
+                    computeGridQuadricPoint(grid);
+                    console.log(id, grid.point);
                 }
                 if (!grid.uv) {
                     computeGridAvgUV(grid);
@@ -541,6 +609,7 @@ var QuadricSimplifier = function () {
     this.source = null;
 
     // privates
+    let scope = this;
     let faces, vertices, uvsArr, hasUVs;
     let edgesMap = new Map(); //Map<edge, Object>, Ojbect { vertices, faces }
     let vertFaceArray = []; //Array<[faces]>: index -> vertexIndex
@@ -646,6 +715,15 @@ var QuadricSimplifier = function () {
     }
 
 
+    function computeQuadricMatrix(face, vertices) {
+        let a = vertices[face.a];
+        let b = vertices[face.b];
+        let c = vertices[face.c];
+        let plane = new THREE.Plane().setFromCoplanarPoints(a, b, c);
+        return new QuadricMatrix(plane.normal.x, plane.normal.y, plane.normal.z, plane.constant);
+    }
+
+
     this.simplify = function (geometry, params) {
         this.source = geometry;
 
@@ -654,87 +732,113 @@ var QuadricSimplifier = function () {
         // calculate QMatrix for every vertex
         for (let i = 0, vl = vertFaceArray.length; i < vl; i++) {
             let faceArr = vertFaceArray[i];
-            let vertQMat;
+            let vertQMat = null;
             for (let j = 0, fl = faceArr.length; j < fl; j++) {
                 let faceObj = faceArr[j];
-                computeFaceQuadricMat(faceObj.f);
+                if (vertQMat == null) {
+                    vertQMat = computeQuadricMatrix(faceObj.f, vertices);
+                } else {
+                    vertQMat.addInPlace(computeQuadricMatrix(faceObj.f, vertices));
+                }
             }
 
         }
 
     }
 
-
-    function QuadricMatrix(a, b, c, d) {
-        // basic 10 elements of Quadric Matrix
-        this.m = [
-            a * a, a * b, a * c, a * d, // 0, 1, 2, 3
-            b * b, b * c, b * d,        //    4, 5, 6
-            c * c, c * d,               //       7, 8
-            d * d                       //          9
-        ];
-        this.matrix = new THREE.Matrix4().set(
-            a * a, a * b, a * c, a * d, 
-            a * b, b * b, b * c, b * d, 
-            a * c, b * c, c * c, c * d, 
-            a * d, b * d, c * d, d * d
-        );
-    }
-    Object.assign(QuadricMatrix.prototype, {
-        add: function (anotherQM) {
-            for (let i = 0; i < 10; i++) {
-                this.m[i] += anotherQM.m[i];
-            }
-            return this;
-        },
-        det: function () {
-            var te = this.m;
-
-            var n11 = te[0], n12 = te[1], n13 = te[2], n14 = te[3];
-            var n21 = te[1], n22 = te[4], n23 = te[5], n24 = te[6];
-            var n31 = te[2], n32 = te[5], n33 = te[7], n34 = te[8];
-            var n41 = te[3], n42 = te[6], n43 = te[8], n44 = te[9];
-
-            return (
-                n41 * (
-                    + n14 * n23 * n32
-                    - n13 * n24 * n32
-                    - n14 * n22 * n33
-                    + n12 * n24 * n33
-                    + n13 * n22 * n34
-                    - n12 * n23 * n34
-                ) +
-                n42 * (
-                    + n11 * n23 * n34
-                    - n11 * n24 * n33
-                    + n14 * n21 * n33
-                    - n13 * n21 * n34
-                    + n13 * n24 * n31
-                    - n14 * n23 * n31
-                ) +
-                n43 * (
-                    + n11 * n24 * n32
-                    - n11 * n22 * n34
-                    - n14 * n21 * n32
-                    + n12 * n21 * n34
-                    + n14 * n22 * n31
-                    - n12 * n24 * n31
-                ) +
-                n44 * (
-                    - n13 * n22 * n31
-                    - n11 * n23 * n32
-                    + n11 * n22 * n33
-                    + n13 * n21 * n32
-                    - n12 * n21 * n33
-                    + n12 * n23 * n31
-                )
-
-            );
-        }
-
-    });
 
 }
+
+/**
+ * Class QuadricMatrix
+ *
+ * @param {*} a
+ * @param {*} b
+ * @param {*} c
+ * @param {*} d
+ */
+function QuadricMatrix(a, b, c, d) {
+    // basic 10 elements of Quadric Matrix
+    this.a = a;
+    this.b = b;
+    this.c = c;
+    this.d = d;
+
+    this.m = [
+        a * a, a * b, a * c, a * d, // 0, 1, 2, 3
+        b * b, b * c, b * d,        //    4, 5, 6
+        c * c, c * d,               //       7, 8
+        d * d                       //          9
+    ];
+
+    // this.matrix = new THREE.Matrix4().set(
+    //     a * a, a * b, a * c, a * d,
+    //     a * b, b * b, b * c, b * d,
+    //     a * c, b * c, c * c, c * d,
+    //     a * d, b * d, c * d, d * d
+    // );
+}
+Object.assign(QuadricMatrix.prototype, {
+
+    addInPlace: function (anotherQM) {
+        for (let i = 0; i < 10; i++) {
+            this.m[i] += anotherQM.m[i];
+        }
+        return this;
+    },
+
+    det: function () {
+        var te = this.m;
+
+        var n11 = te[0], n12 = te[1], n13 = te[2], n14 = te[3];
+        var n21 = te[1], n22 = te[4], n23 = te[5], n24 = te[6];
+        var n31 = te[2], n32 = te[5], n33 = te[7], n34 = te[8];
+        var n41 = te[3], n42 = te[6], n43 = te[8], n44 = te[9];
+
+        return (
+            n41 * (
+                + n14 * n23 * n32
+                - n13 * n24 * n32
+                - n14 * n22 * n33
+                + n12 * n24 * n33
+                + n13 * n22 * n34
+                - n12 * n23 * n34
+            ) +
+            n42 * (
+                + n11 * n23 * n34
+                - n11 * n24 * n33
+                + n14 * n21 * n33
+                - n13 * n21 * n34
+                + n13 * n24 * n31
+                - n14 * n23 * n31
+            ) +
+            n43 * (
+                + n11 * n24 * n32
+                - n11 * n22 * n34
+                - n14 * n21 * n32
+                + n12 * n21 * n34
+                + n14 * n22 * n31
+                - n12 * n24 * n31
+            ) +
+            n44 * (
+                - n13 * n22 * n31
+                - n11 * n23 * n32
+                + n11 * n22 * n33
+                + n13 * n21 * n32
+                - n12 * n21 * n33
+                + n12 * n23 * n31
+            )
+        );
+    },
+
+    clone: function () {
+        return new QuadricMatrix(this.a, this.b, this.c, this.d);
+    }
+
+});
+
+
+
 
 
 

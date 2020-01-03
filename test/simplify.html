@@ -107,54 +107,57 @@
 
 
 			// obj model
-			// new MTLLoader()
-			// 	.setPath('./models/')
-			// 	.load('chair.mtl', function (materials) {
+			new MTLLoader()
+				.setPath('./models/')
+				.load('chair.mtl', function (materials) {
 
-			// 		materials.preload();
+					materials.preload();
 
-			// 		new OBJLoader()
-			// 			.setMaterials(materials)
-			// 			.setPath('./models/')
-			// 			.load('ground.obj', function (obj) {
+					new OBJLoader()
+						.setMaterials(materials)
+						.setPath('./models/')
+						.load('cup.obj', function (obj) {
 
-			// 				mesh = obj.children[0];
-			// 				geometry = mesh.geometry;
-			// 				// mesh.material = material;
-			// 				if (mesh.material.color.r == 1 && mesh.material.color.g == 1 && mesh.material.color.b == 1)
-			// 					mesh.material = material;
+							mesh = obj.children[0];
+							geometry = mesh.geometry;
+							// mesh.material = material;
+							if (mesh.material.color.r == 1 && mesh.material.color.g == 1 && mesh.material.color.b == 1)
+								mesh.material = material;
 
-			// 				group.children[0] = mesh;
+							group.children[0] = mesh;
 
-			// 				wireframe = new THREE.WireframeGeometry(mesh.geometry);
-			// 				line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
+							wireframe = new THREE.WireframeGeometry(mesh.geometry);
+							line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
 
-			// 				line.scale.set(1.001, 1.001, 1.001);
-			// 				group.children[1] = line;
+							line.scale.set(1.001, 1.001, 1.001);
+							group.children[1] = line;
 
-			// 				geometry.computeBoundingBox();
-			// 				console.log(geometry.boundingBox.getSize())
-			// 				sceneBox = geometry.boundingBox;
-			// 				camera.position.set(sceneBox.getSize().x * 2, sceneBox.getSize().y * 2, sceneBox.getSize().z * 2);
-			// 				camera.lookAt(sceneBox.getCenter(new THREE.Vector3()));
+							geometry.computeBoundingBox();
+							console.log(geometry.boundingBox.getSize())
+							sceneBox = geometry.boundingBox;
+							camera.position.set(sceneBox.getSize().x * 2, sceneBox.getSize().y * 2, sceneBox.getSize().z * 2);
+							camera.lookAt(sceneBox.getCenter(new THREE.Vector3()));
 
-			// 			});
+						});
 
-			// 	});
+				});
 
 
 
 			// simplify geometry
 			var simplifyBtn = document.getElementById("simplify");
 			simplifyBtn.onclick = function () {
-				var simplifier = new DefaultSimplifier();
+				var defaultSimplifier = new DefaultSimplifier();
+				var quadricSimplifier = new QuadricSimplifier();
+
 				var segments = parseInt(document.getElementById("segments").value);
 				var errorThreshold = document.getElementById("errorThreshold").value;
-				var newGeom = simplifier.simplify(geometry, {
+				var newGeom = defaultSimplifier.simplify(geometry, {
 					segments: segments,
 					// errorThreshold: errorThreshold, 
 					normalJoinAngle: 75
 				});
+				var newGeom2 = quadricSimplifier.simplify(geometry, {});
 
 				console.log(newGeom.faces.length);
 
