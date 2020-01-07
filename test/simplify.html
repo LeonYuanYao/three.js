@@ -27,6 +27,7 @@
 		import { OBJLoader } from '../examples/jsm/loaders/OBJLoader.js';
 		import { OrbitControls } from '../examples/jsm/controls/OrbitControls.js';
 		import { OBJExporter } from '../examples/jsm/exporters/OBJExporter.js';
+		import { TeapotBufferGeometry } from '../examples/jsm/geometries/TeapotBufferGeometry.js';
 		import { DefaultSimplifier, QuadricSimplifier } from '../node_bin_yy/GeometrySimplifier.js';
 
 		var container;
@@ -87,9 +88,13 @@
 
 
 			// model
-			// var geometry = new THREE.IcosahedronBufferGeometry(length * 2, 4);
+			// var geometry = new THREE.IcosahedronBufferGeometry(length * 2, 2);
+			// var geometry = new THREE.BoxBufferGeometry( length * 2, length * 2, length * 2, 6, 6, 6 );
 			// var geometry = new THREE.CylinderBufferGeometry(length * 2, length * 2, length * 2, 32);
-			var geometry = new THREE.IcosahedronGeometry(length * 2, 3);
+			// var geometry = new THREE.IcosahedronGeometry(length * 2, 3);
+			var geometry = new TeapotBufferGeometry(400, 15, true, true, true, true, true);
+
+
 			// var material = new THREE.MeshPhongMaterial({ color: 0x156289, emissive: 0x072534, flatShading: false });
 			var material = new THREE.MeshPhongMaterial({ color: 0x156289, flatShading: false });
 			var texture = new THREE.TextureLoader().load("../examples/textures/uv_grid_opengl.jpg");
@@ -116,7 +121,7 @@
 					new OBJLoader()
 						.setMaterials(materials)
 						.setPath('./models/')
-						.load('cup.obj', function (obj) {
+						.load('tube.obj', function (obj) {
 
 							mesh = obj.children[0];
 							geometry = mesh.geometry;
@@ -157,7 +162,7 @@
 					// errorThreshold: errorThreshold, 
 					normalJoinAngle: 75
 				});
-				var newGeom2 = quadricSimplifier.simplify(geometry, {});
+				// var newGeom2 = quadricSimplifier.simplify(geometry, {});
 
 				console.log(newGeom.faces.length);
 
@@ -178,7 +183,9 @@
 			// Export button function
 			var exportBtn = document.getElementById("export");
 			exportBtn.onclick = function () {
-				mesh.material.forEach((mat, i) => mat.name = i.toString());
+				if (mesh.material instanceof Array) {
+					mesh.material.forEach((mat, i) => mat.name = i.toString());
+				}
 				var exporter = new OBJExporter();
 				var result = exporter.parse(mesh);
 				// result = result.replace(/o \n/g, '');

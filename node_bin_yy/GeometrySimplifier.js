@@ -252,14 +252,21 @@ var DefaultSimplifier = function () {
         } else {
 
             let m = new THREE.Matrix4();
+            // m.set(
+            //     q.m[0], q.m[1], q.m[2], q.m[3], 
+            //     q.m[1], q.m[4], q.m[5], q.m[6], 
+            //     q.m[2], q.m[5], q.m[7], q.m[8], 
+            //     // q.m[3], q.m[6], q.m[8], q.m[9]
+            //     0, 0, 0, 1
+            // );
+            // m.transpose();
             m.set(
-                q.m[0], q.m[1], q.m[2], q.m[3], 
-                q.m[1], q.m[4], q.m[5], q.m[6], 
-                q.m[2], q.m[5], q.m[7], q.m[8], 
-                // q.m[3], q.m[6], q.m[8], q.m[9]
-                0, 0, 0, 1
+                q.m[0], q.m[1], q.m[2], 0, 
+                q.m[1], q.m[4], q.m[5], 0, 
+                q.m[2], q.m[5], q.m[7], 0, 
+                q.m[3], q.m[6], q.m[8], 1
             );
-            m.transpose();
+            
             try{
                 m = new THREE.Matrix4().getInverse(m, true);
                 let e = m.elements;
@@ -487,7 +494,7 @@ var DefaultSimplifier = function () {
         gridsmap.forEach((grid, id) => {
             if (grid.vertices.length > 0) {
                 if (!grid.point) {
-                    computeGridAvgPoint(grid);
+                    // computeGridAvgPoint(grid);
                     console.log(id, grid.point);
                     computeGridQuadricPoint(grid);
                     console.log(id, grid.point);
@@ -509,6 +516,9 @@ var DefaultSimplifier = function () {
 
             let faceArr = vertFaceArray[i];
 
+            // compatible for non-used vertex
+            if (faceArr === undefined) continue;
+
             let vert = vertices[i];
             let findVertex = newGeom.vertices.find(v => v.gridid == vert.gridid);
 
@@ -517,8 +527,8 @@ var DefaultSimplifier = function () {
                 // vertex not found, needs to add to vertices
                 let index = newGeom.vertices.push(vert) - 1;
                 // set the new face indices
-                for (let i = 0; i < faceArr.length; i++) {
-                    let faceObj = faceArr[i];
+                for (let j = 0; j < faceArr.length; j++) {
+                    let faceObj = faceArr[j];
                     faceObj.f[faceObj.i] = index;
                     faceObj.f.grids[faceObj.i] = vert.gridid;
                 }
@@ -526,8 +536,8 @@ var DefaultSimplifier = function () {
                 // found same grid's vertex, no need to add vertex, just use the same index
                 let index = newGeom.vertices.indexOf(findVertex);
                 // set the new face indices
-                for (let i = 0; i < faceArr.length; i++) {
-                    let faceObj = faceArr[i];
+                for (let j = 0; j < faceArr.length; j++) {
+                    let faceObj = faceArr[j];
                     faceObj.f[faceObj.i] = index;
                     faceObj.f.grids[faceObj.i] = vert.gridid;
                 }
@@ -830,6 +840,16 @@ Object.assign(QuadricMatrix.prototype, {
             )
         );
     },
+
+    matrix: function () {
+        let m = this.m;
+        return new THREE.Matrix4().set(
+            m[0], m[1], m[2], m[3], 
+            m[1], m[4], m[5], m[6], 
+            m[2], m[5], m[7], m[8], 
+            m[3], m[6], m[8], m[9]
+        );
+    }, 
 
     clone: function () {
         return new QuadricMatrix(this.a, this.b, this.c, this.d);
