@@ -12,10 +12,11 @@
 	<div id="info">
 		<a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> - Simplify
 		<input type="button" id="export" value="ExportOBJ" />
-		<input type="button" id="linevisible" value="Line" />
+		<input type="button" id="linevisible" value="Lines" />
 		<input type="button" id="simplify" value="Simplify" />
 		<input type="number" id="errorThreshold" style="width: 50px;" value=1.0 />
 		<input type="number" id="segments" style="width: 50px;" value=5 />
+		<a id="faceCount"></a>
 	</div>
 
 	<script type="module">
@@ -40,6 +41,9 @@
 		var windowHalfY = window.innerHeight / 2;
 
 		var linevisible = true;
+
+		var defaultSimplifier = new DefaultSimplifier();
+		var quadricSimplifier = new QuadricSimplifier();
 
 		init();
 		animate();
@@ -88,11 +92,11 @@
 
 
 			// model
-			// var geometry = new THREE.IcosahedronBufferGeometry(length * 2, 2);
+			var geometry = new THREE.IcosahedronBufferGeometry(length * 2, 2);
 			// var geometry = new THREE.BoxBufferGeometry( length * 2, length * 2, length * 2, 6, 6, 6 );
 			// var geometry = new THREE.CylinderBufferGeometry(length * 2, length * 2, length * 2, 32);
 			// var geometry = new THREE.IcosahedronGeometry(length * 2, 3);
-			var geometry = new TeapotBufferGeometry(400, 15, true, true, true, true, true);
+			// var geometry = new TeapotBufferGeometry(400, 15, true, true, true, true, true);
 
 
 			// var material = new THREE.MeshPhongMaterial({ color: 0x156289, emissive: 0x072534, flatShading: false });
@@ -107,27 +111,33 @@
 
 			var wireframe = new THREE.WireframeGeometry(geometry);
 			line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
-			line.scale.set(1.002, 1.002, 1.002);
+			line.scale.set(1.0001, 1.0001, 1.0001);
 			group.add(line);
 
 
 			// obj model
 			new MTLLoader()
 				.setPath('./models/')
-				.load('chair.mtl', function (materials) {
+				.load('1.mtl', function (materials) {
 
 					materials.preload();
 
 					new OBJLoader()
 						.setMaterials(materials)
 						.setPath('./models/')
-						.load('tube.obj', function (obj) {
-
+						.load('rail.obj', function (obj) {
 							mesh = obj.children[0];
 							geometry = mesh.geometry;
-							// mesh.material = material;
+
 							if (mesh.material.color.r == 1 && mesh.material.color.g == 1 && mesh.material.color.b == 1)
 								mesh.material = material;
+
+							if (mesh.material.bumpMap){
+								// mesh.material.bumpScale = 0.5;
+								var texture = mesh.material.bumpMap;
+								mesh.material.normalMap = texture;
+								mesh.material.bumpMap = null;
+							}
 
 							group.children[0] = mesh;
 
@@ -138,7 +148,7 @@
 							group.children[1] = line;
 
 							geometry.computeBoundingBox();
-							console.log(geometry.boundingBox.getSize())
+							console.log("size", geometry.boundingBox.getSize())
 							sceneBox = geometry.boundingBox;
 							camera.position.set(sceneBox.getSize().x * 2, sceneBox.getSize().y * 2, sceneBox.getSize().z * 2);
 							camera.lookAt(sceneBox.getCenter(new THREE.Vector3()));
@@ -152,23 +162,24 @@
 			// simplify geometry
 			var simplifyBtn = document.getElementById("simplify");
 			simplifyBtn.onclick = function () {
-				var defaultSimplifier = new DefaultSimplifier();
-				var quadricSimplifier = new QuadricSimplifier();
-
 				var segments = parseInt(document.getElementById("segments").value);
 				var errorThreshold = document.getElementById("errorThreshold").value;
+				var t1 = performance.now();
 				var newGeom = defaultSimplifier.simplify(geometry, {
-					segments: segments,
-					// errorThreshold: errorThreshold, 
-					normalJoinAngle: 75
+					// segments: segments,
+					errorThreshold: errorThreshold, 
+					normalJoinAngle: 75, 
+					recomputeNormal: false
 				});
 				// var newGeom2 = quadricSimplifier.simplify(geometry, {});
-
+				
+				console.log("timeDiff", performance.now() - t1);
 				console.log(newGeom.faces.length);
+				document.getElementById("faceCount").innerText = newGeom.faces.length;
 
 				wireframe = new THREE.WireframeGeometry(newGeom);
 				line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
-				line.scale.set(1.002, 1.002, 1.002);
+				line.scale.set(1.0001, 1.0001, 1.0001);
 
 				// mesh = new THREE.Mesh(newGeom, material);
 				mesh.geometry = new THREE.BufferGeometry().fromGeometry(newGeom);

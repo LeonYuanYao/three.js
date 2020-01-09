@@ -9,16 +9,20 @@ import * as THREE from '../build/three.module.js';
 var DefaultSimplifier = function () {
 
     // publics
+    this.name = "DefaultSimplifier";
     this.source = null;
     this.box = new THREE.Box3();
     this.gridSize = null;
     this.segments = null;
+    this.recomputeNormal = false;
 
     // privates
-    let vertFaceArray = []; // Array<[faces]>: index -> vertexIndex
+    let scope = this;
 
-    // Map<gridid, gridinfo>
-    // eg. gridid: "0_2_1", gridinfo: { vertices: [], point: [], uvs: [], newUVs: [] }
+    let vertFaceArray = []; // Array<[FaceInfos]>: index -> vertexIndex
+
+    // Map<gridid, GridInfo>
+    // eg. gridid: "0_2_1", GridInfo: { vertices: [], point: [], uvs: [], newUVs: [] }
     let gridsmap = new Map();
     let xcomp = 0;
     let ycomp = 0;
@@ -27,9 +31,19 @@ var DefaultSimplifier = function () {
     let ysegs = 0;
     let zsegs = 0;
 
-    let scope = this;
+    let gridNewIndexMap = new Map(); // Map<gridid, newIndex>
+
     let faces, vertices, uvsArr, hasUVs;
     let normalDiffThreshold = Math.cos(60 * Math.PI / 180);
+
+    /**
+     * printMsg
+     *
+     * @param {*} msg
+     */
+    function printMsg(msg) {
+        console.log(scope.name + " - " + msg);
+    }
 
 
     /**
@@ -72,32 +86,23 @@ var DefaultSimplifier = function () {
 
             var vertFaceRelation = vertFaceArray[face.a];
             if (!vertFaceRelation) {
-                vertFaceArray[face.a] = [{
-                    f: face,   // the related face
-                    i: "a"     // the face index
-                }];
+                vertFaceArray[face.a] = [new FaceInfo(face, "a")];
             } else {
-                vertFaceRelation.push({ f: face, i: "a" });
+                vertFaceRelation.push(new FaceInfo(face, "a"));
             }
 
             vertFaceRelation = vertFaceArray[face.b];
             if (!vertFaceRelation) {
-                vertFaceArray[face.b] = [{
-                    f: face,   // the related face
-                    i: "b"     // the face index
-                }];
+                vertFaceArray[face.b] = [new FaceInfo(face, "b")];
             } else {
-                vertFaceRelation.push({ f: face, i: "b" });
+                vertFaceRelation.push(new FaceInfo(face, "b"));
             }
 
             vertFaceRelation = vertFaceArray[face.c];
             if (!vertFaceRelation) {
-                vertFaceArray[face.c] = [{
-                    f: face,   // the related face
-                    i: "c"     // the face index
-                }];
+                vertFaceArray[face.c] = [new FaceInfo(face, "c")];
             } else {
-                vertFaceRelation.push({ f: face, i: "c" });
+                vertFaceRelation.push(new FaceInfo(face, "c"));
             }
         }
 
@@ -118,17 +123,21 @@ var DefaultSimplifier = function () {
         scope.source.boundingBox.getCenter(center);
 
         scope.box = scope.source.boundingBox.clone();
-        // scope.box = new THREE.Box3().setFromCenterAndSize(center, size);
+
+        // prevent the gridSize to be larger than the bounding box
+        if (scope.gridSize > size.x && scope.gridSize > size.y && scope.gridSize > size.z) {
+            scope.gridSize = Math.max(size.x, size.y, size.z) / 2;
+        }
 
         if (scope.gridSize) {
             // use gridSize first
-            xcomp = scope.gridSize;
-            ycomp = scope.gridSize;
-            zcomp = scope.gridSize;
+            xcomp = Math.min(scope.gridSize, size.x); // prevent the component less than 2
+            ycomp = Math.min(scope.gridSize, size.y);
+            zcomp = Math.min(scope.gridSize, size.z);
 
-            xsegs = size.x / scope.gridSize;
-            ysegs = size.y / scope.gridSize;
-            zsegs = size.z / scope.gridSize;
+            xsegs = Math.round(size.x / xcomp);
+            ysegs = Math.round(size.y / ycomp);
+            zsegs = Math.round(size.z / zcomp);
 
         } else if (scope.segments) {
             // use segments
@@ -185,12 +194,7 @@ var DefaultSimplifier = function () {
         if (!!grid) {
             grid.vertices.push(vertex);
         } else {
-            grid = {
-                vertices: [vertex],
-                point: null,
-                uvs: [],
-                newUVs: []
-            };
+            grid = new GridInfo([vertex]);
             gridsmap.set(gridid, grid);
         }
         return grid;
@@ -231,7 +235,7 @@ var DefaultSimplifier = function () {
             sumy += grid.vertices[i].y;
             sumz += grid.vertices[i].z;
         }
-        grid.point = new THREE.Vector3(sumx / n, sumy / n, sumz / n);
+        return new THREE.Vector3(sumx / n, sumy / n, sumz / n);
     }
 
 
@@ -247,30 +251,24 @@ var DefaultSimplifier = function () {
             q.addInPlace(grid.vertices[i].q);
         }
         let det = q.det();
+
+        // todo: fix, some vertex will be calculated wrong
         if (Math.abs(det) < 0.0000000001) {
             return computeGridAvgPoint(grid);
         } else {
 
             let m = new THREE.Matrix4();
-            // m.set(
-            //     q.m[0], q.m[1], q.m[2], q.m[3], 
-            //     q.m[1], q.m[4], q.m[5], q.m[6], 
-            //     q.m[2], q.m[5], q.m[7], q.m[8], 
-            //     // q.m[3], q.m[6], q.m[8], q.m[9]
-            //     0, 0, 0, 1
-            // );
-            // m.transpose();
             m.set(
-                q.m[0], q.m[1], q.m[2], 0, 
-                q.m[1], q.m[4], q.m[5], 0, 
-                q.m[2], q.m[5], q.m[7], 0, 
+                q.m[0], q.m[1], q.m[2], 0,
+                q.m[1], q.m[4], q.m[5], 0,
+                q.m[2], q.m[5], q.m[7], 0,
                 q.m[3], q.m[6], q.m[8], 1
             );
-            
-            try{
+
+            try {
                 m = new THREE.Matrix4().getInverse(m, true);
                 let e = m.elements;
-                grid.point = new THREE.Vector3( e[3], e[7], e[11] );
+                return new THREE.Vector3(e[3], e[7], e[11]);
             } catch (e) {
                 return computeGridAvgPoint(grid);
             }
@@ -285,6 +283,7 @@ var DefaultSimplifier = function () {
      * @param {*} grid
      */
     function computeGridAvgUV(grid) {
+        let newUVS = [];
         for (let i = 0, l = grid.uvs.length; i < l; i++) {
             let uvArr = grid.uvs[i];
             let sumx = 0;
@@ -294,12 +293,14 @@ var DefaultSimplifier = function () {
                 sumx += uvArr[j].x;
                 sumy += uvArr[j].y;
             }
-            grid.newUVs[i] = new THREE.Vector2(sumx / n, sumy / n);
+            newUVS[i] = new THREE.Vector2(sumx / n, sumy / n);
         }
+        return newUVS;
     }
 
 
     function computeGridMaxUV(grid) {
+        let newUVS = [];
         for (let i = 0, l = grid.uvs.length; i < l; i++) {
             let uvArr = grid.uvs[i];
             let maxx = 0;
@@ -309,8 +310,9 @@ var DefaultSimplifier = function () {
                 maxx = Math.max(uvArr[j].x, maxx);
                 maxy = Math.max(uvArr[j].y, maxy);
             }
-            grid.newUVs[i] = new THREE.Vector2(maxx, maxy);
+            newUVs[i] = new THREE.Vector2(maxx, maxy);
         }
+        return newUVS;
     }
 
 
@@ -449,6 +451,8 @@ var DefaultSimplifier = function () {
             this.gridSize = Math.max(params.errorThreshold, 0.001) * 2 / 1.7320508075688772;
         }
 
+        this.recomputeNormal = params.recomputeNormal || false;
+
 
         let normalJoinAngle = params.normalJoinAngle || 60;
         normalDiffThreshold = Math.cos(normalJoinAngle * Math.PI / 180);
@@ -457,11 +461,13 @@ var DefaultSimplifier = function () {
 
         let newGeom = new THREE.Geometry();
 
+        printMsg("parseGeometry");
         parseGeometry();
 
         initGridsInfo();
 
         // determine every vertex's box & check face's degeneration
+        printMsg("original face count: " + faces.length);
         for (let i = 0, fl = faces.length; i < fl; i++) {
             let face = faces[i];
 
@@ -469,39 +475,39 @@ var DefaultSimplifier = function () {
             let vertex, grid;
 
             vertex = vertices[face.a];
-            computeQuadricMatrix(vertex, face);
+            // computeQuadricMatrix(vertex, face);
             grid = computeVertexGrid(vertex);
             if (hasUVs) addGridUV(grid, i, "a");
 
             vertex = vertices[face.b];
-            computeQuadricMatrix(vertex, face);
+            // computeQuadricMatrix(vertex, face);
             grid = computeVertexGrid(vertex);
             if (hasUVs) addGridUV(grid, i, "b");
 
             vertex = vertices[face.c];
-            computeQuadricMatrix(vertex, face);
+            // computeQuadricMatrix(vertex, face);
             grid = computeVertexGrid(vertex);
             if (hasUVs) addGridUV(grid, i, "c");
 
             checkFaceDegen(face);
-
         }
+        printMsg("face grids done. ");
 
-        console.log("faces.length", faces.length)
         // let validFaces = faces.filter(f => !f.degenerated);
 
         // set every vertex to be the grid-point-value
+        printMsg("compute vertices");
         gridsmap.forEach((grid, id) => {
             if (grid.vertices.length > 0) {
                 if (!grid.point) {
-                    // computeGridAvgPoint(grid);
-                    console.log(id, grid.point);
-                    computeGridQuadricPoint(grid);
-                    console.log(id, grid.point);
+                    grid.point = computeGridAvgPoint(grid);
+                    // console.log(id, grid.point);
+                    // grid.point = computeGridQuadricPoint(grid);
+                    // console.log(id, grid.point);
                 }
                 if (!grid.uv) {
-                    computeGridAvgUV(grid);
-                    // computeGridMaxUV(grid);
+                    grid.newUVs = computeGridAvgUV(grid);
+                    // grid.newUVs = computeGridMaxUV(grid);
                 }
                 // set rest of the vertices to be the grid's point
                 for (let i = 0; i < grid.vertices.length; i++) {
@@ -512,6 +518,7 @@ var DefaultSimplifier = function () {
 
 
         // filter out the valid vertices & set valid faces new index
+        printMsg("generate new vertices");
         for (let i = 0, al = vertFaceArray.length; i < al; i++) {
 
             let faceArr = vertFaceArray[i];
@@ -520,10 +527,10 @@ var DefaultSimplifier = function () {
             if (faceArr === undefined) continue;
 
             let vert = vertices[i];
-            let findVertex = newGeom.vertices.find(v => v.gridid == vert.gridid);
+            let findIndex = gridNewIndexMap.get(vert.gridid);
 
             // if the grid's vertex has been added already, it is not needed to add again
-            if (!findVertex) {
+            if (!findIndex) {
                 // vertex not found, needs to add to vertices
                 let index = newGeom.vertices.push(vert) - 1;
                 // set the new face indices
@@ -532,13 +539,14 @@ var DefaultSimplifier = function () {
                     faceObj.f[faceObj.i] = index;
                     faceObj.f.grids[faceObj.i] = vert.gridid;
                 }
+                // add this grid-index relation into the map
+                gridNewIndexMap.set(vert.gridid, index);
             } else {
                 // found same grid's vertex, no need to add vertex, just use the same index
-                let index = newGeom.vertices.indexOf(findVertex);
                 // set the new face indices
                 for (let j = 0; j < faceArr.length; j++) {
                     let faceObj = faceArr[j];
-                    faceObj.f[faceObj.i] = index;
+                    faceObj.f[faceObj.i] = findIndex;
                     faceObj.f.grids[faceObj.i] = vert.gridid;
                 }
             }
@@ -546,6 +554,7 @@ var DefaultSimplifier = function () {
         }
 
         // add new faces (which are not degenerated)
+        printMsg("generate new faces");
         for (let i = 0, fl = faces.length; i < fl; i++) {
             let face = faces[i];
             if (!face.degenerated) {
@@ -562,45 +571,68 @@ var DefaultSimplifier = function () {
             }
         }
 
-        newGeom.computeFaceNormals();
+        // recompute normal
+        if (this.recomputeNormal) {
+            printMsg("compute face normals");
+            newGeom.computeFaceNormals();
 
-        // to generate smooth normal on mesh, compare each vertex's face's normals
-        // if one vertex has too much difference on face normals, duplicate it in vertices array
-        for (let i = 0, vl = newGeom.vertices.length; i < vl; i++) {
-            let vertex = newGeom.vertices[i];
-            let filteredFaces = newGeom.faces.filter(f => f.a == i || f.b == i || f.c == i);
-            let fl = filteredFaces.length;
-            if (fl > 1) {
-                let normDiffs = [{
-                    f: [filteredFaces[0]],
-                    n: filteredFaces[0].normal.clone()
-                }];
-                for (let j = 1; j < fl; j++) {
-                    let anotherFace = filteredFaces[j];
-                    compareNormalDiffs(normDiffs, anotherFace);
-                }
-                if (normDiffs.length > 1) {
-                    for (let j = 1, l = normDiffs.length; j < l; j++) {
-                        let ff = normDiffs[j].f;
-                        // duplicate the vertex in array (insert after this vertex)
-                        let newIndex = newGeom.vertices.push(vertex.clone()) - 1;
-                        for (let k = 0, ffl = ff.length; k < ffl; k++) {
-                            if (ff[k].a == i) ff[k].a = newIndex;
-                            if (ff[k].b == i) ff[k].b = newIndex;
-                            if (ff[k].c == i) ff[k].c = newIndex;
+            printMsg("recalculating normals");
+            // to generate smooth normal on mesh, compare each vertex's face's normals
+            // if one vertex has too much difference on face normals, duplicate it in vertices array
+            for (let i = 0, vl = newGeom.vertices.length; i < vl; i++) {
+                let vertex = newGeom.vertices[i];
+                let filteredFaces = newGeom.faces.filter(f => f.a == i || f.b == i || f.c == i);
+                let fl = filteredFaces.length;
+                if (fl > 1) {
+                    let normDiffs = [{
+                        f: [filteredFaces[0]],
+                        n: filteredFaces[0].normal.clone()
+                    }];
+                    for (let j = 1; j < fl; j++) {
+                        let anotherFace = filteredFaces[j];
+                        compareNormalDiffs(normDiffs, anotherFace);
+                    }
+                    if (normDiffs.length > 1) {
+                        for (let j = 1, l = normDiffs.length; j < l; j++) {
+                            let ff = normDiffs[j].f;
+                            // duplicate the vertex in array (insert after this vertex)
+                            let newIndex = newGeom.vertices.push(vertex.clone()) - 1;
+                            for (let k = 0, ffl = ff.length; k < ffl; k++) {
+                                if (ff[k].a == i) ff[k].a = newIndex;
+                                if (ff[k].b == i) ff[k].b = newIndex;
+                                if (ff[k].c == i) ff[k].c = newIndex;
+                            }
                         }
-
                     }
                 }
             }
 
+            printMsg("compute vertex normals");
+            newGeom.computeVertexNormals();
         }
 
         // re-sort the new vertices, to be gpu friendly order. RESULT NOT AS EXPECTED. 
         // resortVerticesOrder(newGeom);
 
         newGeom.computeBoundingBox();
-        newGeom.computeVertexNormals();
+        printMsg("new face count: " + newGeom.faces.length);
+
+        // release memory
+        this.source = null;
+        vertFaceArray = []; 
+        gridsmap = new Map();
+        xcomp = 0;
+        ycomp = 0;
+        zcomp = 0;
+        xsegs = 0;
+        ysegs = 0;
+        zsegs = 0;
+        gridNewIndexMap = new Map(); 
+        faces = null;
+        vertices = null;
+        uvsArr = null;
+        hasUVs = null;
+        normalDiffThreshold = Math.cos(60 * Math.PI / 180);
 
         return newGeom;
     }
@@ -759,6 +791,33 @@ var QuadricSimplifier = function () {
 
 }
 
+
+/**
+ * Class FaceInfo
+ *
+ * @param {*} face
+ * @param {*} i
+ */
+function FaceInfo(face, i) {
+    if (!face || !i) console.error("FaceInfo should have face & i properties. ");
+    this.f = face; // eg. THREE.Face3
+    this.i = i; // eg. "a" / "b" / "c"
+}
+
+
+/**
+ * Class GridInfo
+ *
+ * @param {*} vertices
+ */
+function GridInfo(vertices, uvs) {
+    this.vertices = vertices || [];
+    this.uvs = uvs || [];
+    this.point = null;
+    this.newUVs = [];
+}
+
+
 /**
  * Class QuadricMatrix
  *
@@ -844,12 +903,12 @@ Object.assign(QuadricMatrix.prototype, {
     matrix: function () {
         let m = this.m;
         return new THREE.Matrix4().set(
-            m[0], m[1], m[2], m[3], 
-            m[1], m[4], m[5], m[6], 
-            m[2], m[5], m[7], m[8], 
+            m[0], m[1], m[2], m[3],
+            m[1], m[4], m[5], m[6],
+            m[2], m[5], m[7], m[8],
             m[3], m[6], m[8], m[9]
         );
-    }, 
+    },
 
     clone: function () {
         return new QuadricMatrix(this.a, this.b, this.c, this.d);
