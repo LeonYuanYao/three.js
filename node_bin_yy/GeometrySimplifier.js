@@ -15,6 +15,7 @@ var DefaultSimplifier = function () {
     this.gridSize = null;
     this.segments = null;
     this.recomputeNormal = false;
+    this.preventNoFaces = false; // will generate a simple gemetry (boundingbox) for results without faces
 
     // privates
     let scope = this;
@@ -33,7 +34,7 @@ var DefaultSimplifier = function () {
 
     let gridNewIndexMap = new Map(); // Map<gridid, newIndex>
 
-    let faces, vertices, uvsArr, hasUVs;
+    let size, center, faces, vertices, uvsArr, hasUVs;
     let normalDiffThreshold = Math.cos(60 * Math.PI / 180);
 
     /**
@@ -117,8 +118,8 @@ var DefaultSimplifier = function () {
         gridsmap = new Map();
         scope.source.computeBoundingBox();
 
-        let size = new THREE.Vector3();
-        let center = new THREE.Vector3();
+        size = new THREE.Vector3();
+        center = new THREE.Vector3();
         scope.source.boundingBox.getSize(size);
         scope.source.boundingBox.getCenter(center);
 
@@ -436,6 +437,17 @@ var DefaultSimplifier = function () {
     }
 
 
+    /**
+     * generateSimpleGeometry
+     *
+     * @returns
+     */
+    function generateSimpleGeometry() {
+        let geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
+        geometry.vertices.forEach(v => v.add(center));
+        return geometry;
+    }
+
 
     /**
      * simplify(geometry, params) : THREE.Geometry
@@ -461,6 +473,7 @@ var DefaultSimplifier = function () {
         }
 
         this.recomputeNormal = params.recomputeNormal || false;
+        this.preventNoFaces = params.preventNoFaces || false;
 
 
         let normalJoinAngle = params.normalJoinAngle || 60;
@@ -581,6 +594,9 @@ var DefaultSimplifier = function () {
         }
 
         // todo: if no faces generated
+        if (newGeom.faces.length == 0 && this.preventNoFaces) {
+            newGeom = generateSimpleGeometry();
+        }
 
 
         // recompute normal
@@ -635,6 +651,18 @@ var DefaultSimplifier = function () {
         this.gridSize = null;
         this.segments = null;
         this.recomputeNormal = false;
+        this.preventNoFaces = false;
+        vertFaceArray = []; 
+        gridsmap = new Map();
+        xcomp = 0;
+        ycomp = 0;
+        zcomp = 0;
+        xsegs = 0;
+        ysegs = 0;
+        zsegs = 0;
+        gridNewIndexMap = new Map();
+        size = null; center = null; faces = null; vertices = null; uvsArr = null; hasUVs = null;
+        normalDiffThreshold = Math.cos(60 * Math.PI / 180);
 
         return newGeom;
     }

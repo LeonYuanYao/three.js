@@ -54,7 +54,7 @@
 			container = document.createElement('div');
 			document.body.appendChild(container);
 
-			camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 200000);
+			camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.00001, 200000);
 			camera.up.set(0, 0, 1);
 
 			// scene
@@ -125,7 +125,7 @@
 					new OBJLoader()
 						.setMaterials(materials)
 						.setPath('./models/')
-						.load('chair.obj', function (obj) {
+						.load('test0faces.obj', function (obj) {
 							mesh = obj.children[0];
 							geometry = mesh.geometry;
 
@@ -168,7 +168,8 @@
 					// segments: segments,
 					errorThreshold: errorThreshold, 
 					normalJoinAngle: 75, 
-					recomputeNormal: false
+					recomputeNormal: false, 
+					preventNoFaces: true
 				});
 				// var newGeom2 = quadricSimplifier.simplify(geometry, {});
 				

@@ -1,0 +1,4 @@
+newmtl 1
+d 1
+Kd 0.8 0.8 0.8
+map_bump map.png
