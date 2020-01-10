@@ -125,15 +125,15 @@ var DefaultSimplifier = function () {
         scope.box = scope.source.boundingBox.clone();
 
         // prevent the gridSize to be larger than the bounding box
-        if (scope.gridSize > size.x && scope.gridSize > size.y && scope.gridSize > size.z) {
-            scope.gridSize = Math.max(size.x, size.y, size.z) / 2;
-        }
+        // if (scope.gridSize > size.x && scope.gridSize > size.y && scope.gridSize > size.z) {
+        //     scope.gridSize = Math.max(size.x, size.y, size.z) / 2;
+        // }
 
         if (scope.gridSize) {
             // use gridSize first
             xcomp = Math.min(scope.gridSize, size.x); // prevent the component less than 2
-            ycomp = Math.min(scope.gridSize, size.y);
-            zcomp = Math.min(scope.gridSize, size.z);
+            ycomp = Math.min(scope.gridSize, size.y); // the segments will be calculated by `Math.round`
+            zcomp = Math.min(scope.gridSize, size.z); // if component == size, the grids will be least: 2x2x2
 
             xsegs = Math.round(size.x / xcomp);
             ysegs = Math.round(size.y / ycomp);
@@ -299,6 +299,12 @@ var DefaultSimplifier = function () {
     }
 
 
+    /**
+     *
+     *
+     * @param {*} grid
+     * @returns
+     */
     function computeGridMaxUV(grid) {
         let newUVS = [];
         for (let i = 0, l = grid.uvs.length; i < l; i++) {
@@ -357,6 +363,7 @@ var DefaultSimplifier = function () {
         });
     }
 
+
     /**
      * resortVerticesOrder
      *
@@ -408,6 +415,7 @@ var DefaultSimplifier = function () {
 
     }
 
+
     /**
      * computeQuadricMatrix
      *
@@ -426,6 +434,7 @@ var DefaultSimplifier = function () {
             vertex.q = q;
         }
     }
+
 
 
     /**
@@ -571,6 +580,9 @@ var DefaultSimplifier = function () {
             }
         }
 
+        // todo: if no faces generated
+
+
         // recompute normal
         if (this.recomputeNormal) {
             printMsg("compute face normals");
@@ -619,20 +631,10 @@ var DefaultSimplifier = function () {
 
         // release memory
         this.source = null;
-        vertFaceArray = []; 
-        gridsmap = new Map();
-        xcomp = 0;
-        ycomp = 0;
-        zcomp = 0;
-        xsegs = 0;
-        ysegs = 0;
-        zsegs = 0;
-        gridNewIndexMap = new Map(); 
-        faces = null;
-        vertices = null;
-        uvsArr = null;
-        hasUVs = null;
-        normalDiffThreshold = Math.cos(60 * Math.PI / 180);
+        this.box = new THREE.Box3();
+        this.gridSize = null;
+        this.segments = null;
+        this.recomputeNormal = false;
 
         return newGeom;
     }
