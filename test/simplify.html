@@ -6,17 +6,37 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 	<link type="text/css" rel="stylesheet" href="../examples/main.css">
+	<style>
+		#upload {
+			width: 150px;
+			display: block;
+			position: absolute;
+			left: 10px;
+			top: 10px;
+		}
+
+		#title {
+			display: block;
+			float: center;
+		}
+	</style>
 </head>
 
 <body>
 	<div id="info">
-		<a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> - Simplify
-		<input type="button" id="export" value="ExportOBJ" />
-		<input type="button" id="linevisible" value="Lines" />
-		<input type="button" id="simplify" value="Simplify" />
-		<input type="number" id="errorThreshold" style="width: 50px;" value=1.0 />
-		<input type="number" id="segments" style="width: 50px;" value=5 />
-		<a id="faceCount"></a>
+		<div id="title">
+			<a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> - Simplify
+			<input type="button" id="export" value="ExportOBJ" />
+			<input type="button" id="linevisible" value="Lines" />
+			<input type="button" id="simplify" value="Simplify" />
+			<input type="number" id="errorThreshold" style="width: 50px;" value=1.0 />
+			<input type="number" id="segments" style="width: 50px;" value=5 />
+			<a id="faceCount"></a>
+			<div id="upload">
+				<input type="file" id="fileInput" value="Upload" />
+			</div>
+		</div>
+
 	</div>
 
 	<script type="module">
@@ -29,7 +49,7 @@
 		import { OrbitControls } from '../examples/jsm/controls/OrbitControls.js';
 		import { OBJExporter } from '../examples/jsm/exporters/OBJExporter.js';
 		import { TeapotBufferGeometry } from '../examples/jsm/geometries/TeapotBufferGeometry.js';
-		import { DefaultSimplifier, QuadricSimplifier } from '../node_bin_yy/GeometrySimplifier.js';
+		import { DefaultSimplifier, QuadricSimplifier } from './GeometrySimplifier.js';
 
 		var container;
 
@@ -54,7 +74,7 @@
 			container = document.createElement('div');
 			document.body.appendChild(container);
 
-			camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.00001, 200000);
+			camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 200000);
 			camera.up.set(0, 0, 1);
 
 			// scene
@@ -72,23 +92,6 @@
 
 			group = new THREE.Group();
 			sceneBox = new THREE.Box3();
-
-			// init model
-			var grids = 5;
-			var length = 10;
-
-			// for (let i = 0; i < grids; i++) {
-			// 	for (let j = 0; j < grids; j++) {
-			// 		var geometry = new THREE.BoxGeometry(length, length, length);
-			// 		var material = new THREE.MeshPhongMaterial({ color: 0x156289, emissive: 0x072534, flatShading: true });
-			// 		var mesh = new THREE.Mesh(geometry, material);
-			// 		mesh.position.set(i * length * 1.1, j * length * 1.1, 0);
-			// 		mesh.updateMatrixWorld();
-			// 		geometry.computeBoundingBox();
-			// 		sceneBox.union(geometry.boundingBox.clone().applyMatrix4(mesh.matrix));
-			// 		group.add(mesh);
-			// 	}
-			// }
 
 
 			// model
@@ -111,52 +114,10 @@
 
 			var wireframe = new THREE.WireframeGeometry(geometry);
 			line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
-			line.scale.set(1.0001, 1.0001, 1.0001);
+			line.scale.set(1.001, 1.001, 1.001);
 			group.add(line);
 
-
-			// obj model
-			new MTLLoader()
-				.setPath('./models/')
-				.load('1.mtl', function (materials) {
-
-					materials.preload();
-
-					new OBJLoader()
-						.setMaterials(materials)
-						.setPath('./models/')
-						.load('test0faces.obj', function (obj) {
-							mesh = obj.children[0];
-							geometry = mesh.geometry;
-
-							// if (mesh.material.color.r == 1 && mesh.material.color.g == 1 && mesh.material.color.b == 1)
-							// 	mesh.material = material;
-
-							// if (mesh.material.bumpMap){
-							// 	var texture = mesh.material.bumpMap;
-							// 	mesh.material.normalMap = texture;
-							// 	mesh.material.bumpMap = null;
-							// }
-
-							group.children[0] = mesh;
-
-							wireframe = new THREE.WireframeGeometry(mesh.geometry);
-							line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
-
-							line.scale.set(1.001, 1.001, 1.001);
-							group.children[1] = line;
-
-							geometry.computeBoundingBox();
-							console.log("size", geometry.boundingBox.getSize())
-							sceneBox = geometry.boundingBox;
-							camera.position.set(sceneBox.getSize().x * 2, sceneBox.getSize().y * 2, sceneBox.getSize().z * 2);
-							camera.lookAt(sceneBox.getCenter(new THREE.Vector3()));
-
-						});
-
-				});
-
-
+			
 
 			// simplify geometry
 			var simplifyBtn = document.getElementById("simplify");
@@ -166,20 +127,21 @@
 				var t1 = performance.now();
 				var newGeom = defaultSimplifier.simplify(geometry, {
 					// segments: segments,
-					errorThreshold: errorThreshold, 
-					normalJoinAngle: 75, 
-					recomputeNormal: false, 
-					preventNoFaces: true
+					errorThreshold: errorThreshold,
+					normalJoinAngle: 75,
+					recomputeNormal: false,
+					preventNoFaces: false,
+					rounding: false
 				});
 				// var newGeom2 = quadricSimplifier.simplify(geometry, {});
-				
+
 				console.log("timeDiff", performance.now() - t1);
 				console.log(newGeom.faces.length);
 				document.getElementById("faceCount").innerText = newGeom.faces.length;
 
 				wireframe = new THREE.WireframeGeometry(newGeom);
 				line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
-				line.scale.set(1.0001, 1.0001, 1.0001);
+				line.scale.set(1.001, 1.001, 1.001);
 
 				// mesh = new THREE.Mesh(newGeom, material);
 				mesh.geometry = new THREE.BufferGeometry().fromGeometry(newGeom);
@@ -189,7 +151,9 @@
 				sceneBox.union(newGeom.boundingBox.clone().applyMatrix4(mesh.matrix));
 			}
 
+
 			//
+
 
 			// Export button function
 			var exportBtn = document.getElementById("export");
@@ -212,6 +176,56 @@
 				a.dataset.downloadurl = [MIME_TYPE, a.download, a.href].join(':');
 				a.click();
 			}
+
+
+			var path = './models/';
+			var mtl = '1.mtl';
+			var obj = '066296d3-187c-43bb-b19a-a2960f35a3e4.obj';
+
+			// obj model
+			var inputBtn = document.getElementById("fileInput");
+			inputBtn.onchange = function () {
+
+				var rootFile = Array.from(inputBtn.files).find(f => f.name.indexOf(".obj") != -1);
+
+				if (rootFile) {
+
+					var objUrl = URL.createObjectURL(rootFile);
+
+					new MTLLoader()
+						.setPath(path)
+						.load(mtl, function (materials) {
+
+							materials.preload();
+
+							new OBJLoader()
+								// .setMaterials(materials)
+								.load(objUrl, function (obj) {
+									mesh = obj.children[0];
+									geometry = mesh.geometry;
+									mesh.material = material;
+
+									group.children[0] = mesh;
+
+									wireframe = new THREE.WireframeGeometry(mesh.geometry);
+									line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0xffffff }));
+
+									line.scale.set(1.001, 1.001, 1.001);
+									group.children[1] = line;
+
+									geometry.computeBoundingBox();
+									console.log("size", geometry.boundingBox.getSize())
+									sceneBox = geometry.boundingBox;
+									camera.position.set(sceneBox.getSize().x * 2, sceneBox.getSize().y * 2, sceneBox.getSize().z * 2);
+									camera.lookAt(sceneBox.getCenter(new THREE.Vector3()));
+								});
+
+						});
+
+				}
+
+			}
+
 
 
 			//

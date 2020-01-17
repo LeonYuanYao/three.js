@@ -1,4 +1,4 @@
 newmtl 1
 d 1
-Kd 0.8 0.8 0.8
+Kd 0.0823 0.384 0.145
 map_bump map.png

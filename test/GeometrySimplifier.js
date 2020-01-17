@@ -15,7 +15,8 @@ var DefaultSimplifier = function () {
     this.gridSize = null;
     this.segments = null;
     this.recomputeNormal = false;
-    this.preventNoFaces = false; // will generate a simple gemetry (boundingbox) for results without faces
+    this.preventNoFaces = false; // will generate a simple geometry (boundingbox) for results without faces
+    this.rounding = true;
 
     // privates
     let scope = this;
@@ -136,9 +137,16 @@ var DefaultSimplifier = function () {
             ycomp = Math.min(scope.gridSize, size.y); // the segments will be calculated by `Math.round`
             zcomp = Math.min(scope.gridSize, size.z); // if component == size, the grids will be least: 2x2x2
 
-            xsegs = Math.round(size.x / xcomp);
-            ysegs = Math.round(size.y / ycomp);
-            zsegs = Math.round(size.z / zcomp);
+            if (scope.rounding) {
+                xsegs = Math.round(size.x / xcomp);
+                ysegs = Math.round(size.y / ycomp);
+                zsegs = Math.round(size.z / zcomp);
+            } else {
+                xsegs = 0 | (size.x / xcomp);
+                ysegs = 0 | (size.y / ycomp);
+                zsegs = 0 | (size.z / zcomp);
+            }
+
 
         } else if (scope.segments) {
             // use segments
@@ -163,18 +171,20 @@ var DefaultSimplifier = function () {
      * @returns
      */
     function computeGridid(vertex) {
-        let x = Math.round((vertex.x - scope.box.min.x) / xcomp);
-        let y = Math.round((vertex.y - scope.box.min.y) / ycomp);
-        let z = Math.round((vertex.z - scope.box.min.z) / zcomp);
 
-        // prevent the vertex to be fitted in out-of-box grid (gridid is based on lower bound index)
-        // if (x >= xsegs) x = xsegs - 1;
-        // if (y >= ysegs) y = ysegs - 1;
-        // if (z >= zsegs) z = zsegs - 1;
+        let x, y, z;
+        x = Math.round((vertex.x - scope.box.min.x) / xcomp);
+        y = Math.round((vertex.y - scope.box.min.y) / ycomp);
+        z = Math.round((vertex.z - scope.box.min.z) / zcomp);
 
-        // if (x <= 0) x = - 1;
-        // if (y <= 0) y = - 1;
-        // if (z <= 0) z = - 1;
+        if (scope.rounding) {
+            
+        } else {
+            // prevent the vertex to be fitted in out-of-box grid (gridid is based on lower bound index)
+            if (x >= xsegs) x = xsegs - 1;
+            if (y >= ysegs) y = ysegs - 1;
+            if (z >= zsegs) z = zsegs - 1;
+        }
 
         return `${x}_${y}_${z}`;
     }
@@ -472,8 +482,9 @@ var DefaultSimplifier = function () {
             this.gridSize = Math.max(params.errorThreshold, 0.001) * 2 / 1.7320508075688772;
         }
 
-        this.recomputeNormal = params.recomputeNormal || false;
-        this.preventNoFaces = params.preventNoFaces || false;
+        this.recomputeNormal = params.recomputeNormal !== undefined ? params.recomputeNormal : false;
+        this.preventNoFaces = params.preventNoFaces !== undefined ? params.preventNoFaces : false;
+        this.rounding = params.rounding !== undefined ? params.rounding : true;
 
 
         let normalJoinAngle = params.normalJoinAngle || 60;
@@ -652,7 +663,7 @@ var DefaultSimplifier = function () {
         this.segments = null;
         this.recomputeNormal = false;
         this.preventNoFaces = false;
-        vertFaceArray = []; 
+        vertFaceArray = [];
         gridsmap = new Map();
         xcomp = 0;
         ycomp = 0;
