@@ -9,7 +9,7 @@
 	<body>
 
 		<div id="container"></div>
-		<div id="info"><a href="http://threejs.org" target="_blank" rel="noopener">threejs</a> - Transparency with Premultiplied Alpha (right) and without (left)</div>
+		<div id="info"><a href="https://threejs.org" target="_blank" rel="noopener">threejs</a> - Transparency with Premultiplied Alpha (right) and without (left)</div>
 
 		<script type="module">
 
@@ -20,7 +20,6 @@
 			import { GUI } from './jsm/libs/dat.gui.module.js';
 			import { OrbitControls } from './jsm/controls/OrbitControls.js';
 			import { RGBELoader } from './jsm/loaders/RGBELoader.js';
-			import { PMREMGenerator } from './jsm/pmrem/PMREMGenerator.js';
 
 			var params = {
 				color: 0xffffff,
@@ -40,7 +39,7 @@
 			var hdrEquirect = new RGBELoader()
 				.setDataType( THREE.UnsignedByteType )
 				.setPath( 'textures/equirectangular/' )
-				.load( 'pedestrian_overpass_1k.hdr', function ( texture ) {
+				.load( 'royal_esplanade_1k.hdr', function ( texture ) {
 
 					init();
 					animate();
@@ -71,7 +70,7 @@
 
 				//
 
-				var pmremGenerator = new PMREMGenerator( renderer );
+				var pmremGenerator = new THREE.PMREMGenerator( renderer );
 				hdrCubeRenderTarget = pmremGenerator.fromEquirectangular( hdrEquirect );
 				hdrEquirect.dispose();
 				pmremGenerator.dispose();
