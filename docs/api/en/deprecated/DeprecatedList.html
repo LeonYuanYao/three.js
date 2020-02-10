@@ -152,14 +152,6 @@
 
 
 
-		<h2>Geometry</h2>
-
-		<p>
-			Geometry.computeTangents() has been removed.<br /><br />
-
-			Geometry.computeLineDistances() has been removed. Use [page:Line.computeLineDistances] instead.<br /><br />
-		</p>
-
 		<h3>[page:BufferGeometry]</h3>
 		<p>
 			BufferGeometry.addIndex has been renamed to [page:BufferGeometry.setIndex].<br /><br />
@@ -176,13 +168,25 @@
 
 			BufferGeometry.offsets has been renamed to [page:BufferGeometry.groups].<br /><br />
 
+			BufferGeometry.applyMatrix() has been renamed to [page:BufferGeometry.applyMatrix4]().
 		</p>
+
+
+
 
 		<h3>[page:CubeGeometry]</h3>
 		<p>CubeGeometry has been renamed to [page:BoxGeometry].</p>
 
+
+
 		<h3>[page:Geometry]</h3>
-		<p>Geometry.computeTangents() has been removed.</p>
+		<p>
+			Geometry.computeTangents() has been removed.<br /><br />
+
+			Geometry.computeLineDistances() has been removed. Use [page:Line.computeLineDistances] instead.<br /><br />
+
+			Geometry.applyMatrix() has been renamed to [page:Geometry.applyMatrix4]().
+		</p>
 
 		<h3>[page:GeometryUtils]</h3>
 		<p>
@@ -282,6 +286,9 @@
 
 		<h3>[page:Face4]</h3>
 		<p>Face4 has been removed. Use [page:Face3] instead.</p>
+
+		<h3>[page:Frustum]</h3>
+		<p>Frustum.setFromMatrix() has been renamed to [page:Frustum.setFromProjectionMatrix]().</p>
 
 		<h3>[page:Line3]</h3>
 		<p>Line3.center has been renamed to [page:Line3.getCenter]().</p>
@@ -458,7 +465,10 @@
 
 			Object3D.translate() has been removed. Use [page:Object3D.translateOnAxis]( axis, distance ) instead.<br /><br />
 
-			Object3D.useQuaternion has been removed. The library now uses quaternions by default.
+			Object3D.useQuaternion has been removed. The library now uses quaternions by default.<br /><br />
+
+			Object3D.applyMatrix() has been renamed to [page:Object3D.applyMatrix4]().
+
 		</p>
 
 		<h3>[page:LensFlare]</h3>
