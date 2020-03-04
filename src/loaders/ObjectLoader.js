@@ -19,9 +19,11 @@ import {
 	LinearMipmapNearestFilter,
 	LinearMipmapLinearFilter
 } from '../constants.js';
+import { BufferAttribute } from '../core/BufferAttribute.js';
 import { Color } from '../math/Color.js';
 import { Object3D } from '../core/Object3D.js';
 import { Group } from '../objects/Group.js';
+import { InstancedMesh } from '../objects/InstancedMesh.js';
 import { Sprite } from '../objects/Sprite.js';
 import { Points } from '../objects/Points.js';
 import { Line } from '../objects/Line.js';
@@ -417,17 +419,7 @@ ObjectLoader.prototype = Object.assign( Object.create( Loader.prototype ), {
 
 					case 'Geometry':
 
-						if ( 'THREE' in window && 'LegacyJSONLoader' in THREE ) {
-
-							var geometryLoader = new THREE.LegacyJSONLoader();
-							geometry = geometryLoader.parse( data, this.resourcePath ).geometry;
-
-
-						} else {
-
-							console.error( 'THREE.ObjectLoader: You have to import LegacyJSONLoader in order load geometry data of type "Geometry".' );
-
-						}
+						console.error( 'THREE.ObjectLoader: Loading "Geometry" is not supported anymore.' );
 
 						break;
 
@@ -845,7 +837,17 @@ ObjectLoader.prototype = Object.assign( Object.create( Loader.prototype ), {
 
 				}
 
-				if ( data.drawMode !== undefined ) object.setDrawMode( data.drawMode );
+				break;
+
+			case 'InstancedMesh':
+
+				var geometry = getGeometry( data.geometry );
+				var material = getMaterial( data.material );
+				var count = data.count;
+				var instanceMatrix = data.instanceMatrix;
+
+				object = new InstancedMesh( geometry, material, count );
+				object.instanceMatrix = new BufferAttribute( new Float32Array( instanceMatrix.array ), 16 );
 
 				break;
 
@@ -949,6 +951,8 @@ ObjectLoader.prototype = Object.assign( Object.create( Loader.prototype ), {
 		}
 
 		if ( data.type === 'LOD' ) {
+
+			if ( data.autoUpdate !== undefined ) object.autoUpdate = data.autoUpdate;
 
 			var levels = data.levels;
 

@@ -226,7 +226,7 @@ THREE.GLTFExporter.prototype = {
 		 */
 		function isPowerOfTwo( image ) {
 
-			return THREE.Math.isPowerOfTwo( image.width ) && THREE.Math.isPowerOfTwo( image.height );
+			return THREE.MathUtils.isPowerOfTwo( image.width ) && THREE.MathUtils.isPowerOfTwo( image.height );
 
 		}
 
@@ -759,8 +759,8 @@ THREE.GLTFExporter.prototype = {
 
 					console.warn( 'GLTFExporter: Resized non-power-of-two image.', image );
 
-					canvas.width = THREE.Math.floorPowerOfTwo( canvas.width );
-					canvas.height = THREE.Math.floorPowerOfTwo( canvas.height );
+					canvas.width = THREE.MathUtils.floorPowerOfTwo( canvas.width );
+					canvas.height = THREE.MathUtils.floorPowerOfTwo( canvas.height );
 
 				}
 
@@ -1019,11 +1019,7 @@ THREE.GLTFExporter.prototype = {
 
 			}
 
-			if ( material.isMeshBasicMaterial ||
-				material.isLineBasicMaterial ||
-				material.isPointsMaterial ) {
-
-			} else {
+			if ( material.emissive ) {
 
 				// emissiveFactor
 				var emissive = material.emissive.clone().multiplyScalar( material.emissiveIntensity ).toArray();
@@ -1135,10 +1131,25 @@ THREE.GLTFExporter.prototype = {
 		 */
 		function processMesh( mesh ) {
 
-			var cacheKey = mesh.geometry.uuid + ':' + mesh.material.uuid;
-			if ( cachedData.meshes.has( cacheKey ) ) {
+			var meshCacheKeyParts = [ mesh.geometry.uuid ];
+			if ( Array.isArray( mesh.material ) ) {
 
-				return cachedData.meshes.get( cacheKey );
+				for ( var i = 0, l = mesh.material.length; i < l; i ++ ) {
+
+					meshCacheKeyParts.push( mesh.material[ i ].uuid	);
+
+				}
+
+			} else {
+
+				meshCacheKeyParts.push( mesh.material.uuid );
+
+			}
+
+			var meshCacheKey = meshCacheKeyParts.join( ':' );
+			if ( cachedData.meshes.has( meshCacheKey ) ) {
+
+				return cachedData.meshes.get( meshCacheKey );
 
 			}
 
@@ -1175,20 +1186,7 @@ THREE.GLTFExporter.prototype = {
 
 				}
 
-				if ( mesh.drawMode === THREE.TriangleFanDrawMode ) {
-
-					console.warn( 'GLTFExporter: TriangleFanDrawMode and wireframe incompatible.' );
-					mode = WEBGL_CONSTANTS.TRIANGLE_FAN;
-
-				} else if ( mesh.drawMode === THREE.TriangleStripDrawMode ) {
-
-					mode = mesh.material.wireframe ? WEBGL_CONSTANTS.LINE_STRIP : WEBGL_CONSTANTS.TRIANGLE_STRIP;
-
-				} else {
-
-					mode = mesh.material.wireframe ? WEBGL_CONSTANTS.LINES : WEBGL_CONSTANTS.TRIANGLES;
-
-				}
+				mode = mesh.material.wireframe ? WEBGL_CONSTANTS.LINES : WEBGL_CONSTANTS.TRIANGLES;
 
 			}
 
@@ -1215,11 +1213,11 @@ THREE.GLTFExporter.prototype = {
 
 				console.warn( 'THREE.GLTFExporter: Creating normalized normal attribute from the non-normalized one.' );
 
-				geometry.addAttribute( 'normal', createNormalizedNormalAttribute( originalNormal ) );
+				geometry.setAttribute( 'normal', createNormalizedNormalAttribute( originalNormal ) );
 
 			}
 
-			// @QUESTION Detect if .vertexColors = THREE.VertexColors?
+			// @QUESTION Detect if .vertexColors = true?
 			// For every attribute create an accessor
 			var modifiedAttribute = null;
 			for ( var attributeName in geometry.attributes ) {
@@ -1269,7 +1267,7 @@ THREE.GLTFExporter.prototype = {
 
 			}
 
-			if ( originalNormal !== undefined ) geometry.addAttribute( 'normal', originalNormal );
+			if ( originalNormal !== undefined ) geometry.setAttribute( 'normal', originalNormal );
 
 			// Skip if no exportable attributes found
 			if ( Object.keys( attributes ).length === 0 ) {
@@ -1339,14 +1337,18 @@ THREE.GLTFExporter.prototype = {
 						// Clones attribute not to override
 						var relativeAttribute = attribute.clone();
 
-						for ( var j = 0, jl = attribute.count; j < jl; j ++ ) {
+						if ( ! geometry.morphTargetsRelative ) {
 
-							relativeAttribute.setXYZ(
-								j,
-								attribute.getX( j ) - baseAttribute.getX( j ),
-								attribute.getY( j ) - baseAttribute.getY( j ),
-								attribute.getZ( j ) - baseAttribute.getZ( j )
-							);
+							for ( var j = 0, jl = attribute.count; j < jl; j ++ ) {
+
+								relativeAttribute.setXYZ(
+									j,
+									attribute.getX( j ) - baseAttribute.getX( j ),
+									attribute.getY( j ) - baseAttribute.getY( j ),
+									attribute.getZ( j ) - baseAttribute.getZ( j )
+								);
+
+							}
 
 						}
 
@@ -1472,7 +1474,7 @@ THREE.GLTFExporter.prototype = {
 			outputJSON.meshes.push( gltfMesh );
 
 			var index = outputJSON.meshes.length - 1;
-			cachedData.meshes.set( cacheKey, index );
+			cachedData.meshes.set( meshCacheKey, index );
 
 			return index;
 
@@ -1515,7 +1517,7 @@ THREE.GLTFExporter.prototype = {
 				gltfCamera.perspective = {
 
 					aspectRatio: camera.aspect,
-					yfov: THREE.Math.degToRad( camera.fov ),
+					yfov: THREE.MathUtils.degToRad( camera.fov ),
 					zfar: camera.far <= 0 ? 0.001 : camera.far,
 					znear: camera.near < 0 ? 0 : camera.near
 
@@ -1659,6 +1661,9 @@ THREE.GLTFExporter.prototype = {
 			var node = outputJSON.nodes[ nodeMap.get( object ) ];
 
 			var skeleton = object.skeleton;
+
+			if ( skeleton === undefined ) return null;
+
 			var rootJoint = object.skeleton.bones[ 0 ];
 
 			if ( rootJoint === undefined ) return null;
@@ -1913,12 +1918,6 @@ THREE.GLTFExporter.prototype = {
 			if ( scene.name !== '' ) {
 
 				gltfScene.name = scene.name;
-
-			}
-
-			if ( scene.userData && Object.keys( scene.userData ).length > 0 ) {
-
-				gltfScene.extras = serializeUserData( scene );
 
 			}
 

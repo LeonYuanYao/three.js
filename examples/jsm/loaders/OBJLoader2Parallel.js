@@ -16,10 +16,10 @@ import { OBJLoader2 } from "./OBJLoader2.js";
 
 // Imports only related to worker (when standard workers (modules aren't supported) are used)
 import { OBJLoader2Parser } from "./obj2/worker/parallel/OBJLoader2Parser.js";
-import { ObjectManipulator } from "./obj2/utils/ObjectManipulator.js";
 import {
 	WorkerRunner,
-	DefaultWorkerPayloadHandler
+	DefaultWorkerPayloadHandler,
+	ObjectManipulator
 } from "./obj2/worker/parallel/WorkerRunner.js";
 
 
@@ -40,7 +40,7 @@ const OBJLoader2Parallel = function ( manager ) {
 
 };
 
-OBJLoader2Parallel.OBJLOADER2_PARALLEL_VERSION = '3.1.0';
+OBJLoader2Parallel.OBJLOADER2_PARALLEL_VERSION = '3.1.2';
 console.info( 'Using OBJLoader2Parallel version: ' + OBJLoader2Parallel.OBJLOADER2_PARALLEL_VERSION );
 
 
@@ -92,22 +92,21 @@ OBJLoader2Parallel.prototype = Object.assign( Object.create( OBJLoader2.prototyp
 		let codeBuilderInstructions = new CodeBuilderInstructions( true, true, this.preferJsmWorker );
 		if ( codeBuilderInstructions.isSupportsJsmWorker() ) {
 
-			codeBuilderInstructions.setJsmWorkerFile( '../../src/loaders/worker/parallel/jsm/OBJLoader2Worker.js' );
+			codeBuilderInstructions.setJsmWorkerFile( '../examples/loaders/jsm/obj2/worker/parallel/jsm/OBJLoader2Worker.js' );
 
 		}
 		if ( codeBuilderInstructions.isSupportsStandardWorker() ) {
 
-			let codeOBJLoader2Parser = CodeSerializer.serializeClass( 'OBJLoader2Parser', OBJLoader2Parser );
-			let codeObjectManipulator = CodeSerializer.serializeObject( 'ObjectManipulator', ObjectManipulator );
-			let codeParserPayloadHandler = CodeSerializer.serializeClass( 'DefaultWorkerPayloadHandler', DefaultWorkerPayloadHandler );
-			let codeWorkerRunner = CodeSerializer.serializeClass( 'WorkerRunner', WorkerRunner );
+			let objectManipulator = new ObjectManipulator();
+			let defaultWorkerPayloadHandler = new DefaultWorkerPayloadHandler( this.parser );
+			let workerRunner = new WorkerRunner( {} );
+			codeBuilderInstructions.addCodeFragment( CodeSerializer.serializeClass( OBJLoader2Parser, this.parser ) );
+			codeBuilderInstructions.addCodeFragment( CodeSerializer.serializeClass( ObjectManipulator, objectManipulator ) );
+			codeBuilderInstructions.addCodeFragment( CodeSerializer.serializeClass( DefaultWorkerPayloadHandler, defaultWorkerPayloadHandler ) );
+			codeBuilderInstructions.addCodeFragment( CodeSerializer.serializeClass( WorkerRunner, workerRunner ) );
 
-			codeBuilderInstructions.addCodeFragment( codeOBJLoader2Parser );
-			codeBuilderInstructions.addCodeFragment( codeObjectManipulator );
-			codeBuilderInstructions.addCodeFragment( codeParserPayloadHandler );
-			codeBuilderInstructions.addCodeFragment( codeWorkerRunner );
-
-			codeBuilderInstructions.addStartCode( 'new WorkerRunner( new DefaultWorkerPayloadHandler( new OBJLoader2Parser() ) );' );
+			let startCode = 'new ' + workerRunner.constructor.name + '( new ' + defaultWorkerPayloadHandler.constructor.name + '( new ' + this.parser.constructor.name + '() ) );';
+			codeBuilderInstructions.addStartCode( startCode );
 
 		}
 		return codeBuilderInstructions;
@@ -189,8 +188,8 @@ OBJLoader2Parallel.prototype = Object.assign( Object.create( OBJLoader2.prototyp
 						disregardNormals: this.parser.disregardNormals,
 						materialPerSmoothingGroup: this.parser.materialPerSmoothingGroup,
 						useOAsMesh: this.parser.useOAsMesh,
+						materials: this.materialHandler.getMaterialsJSON()
 					},
-					materials: this.materialHandler.getMaterialsJSON(),
 					data: {
 						input: content,
 						options: null
