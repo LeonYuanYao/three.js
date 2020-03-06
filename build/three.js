@@ -23276,7 +23276,6 @@
 			_preserveDrawingBuffer = parameters.preserveDrawingBuffer !== undefined ? parameters.preserveDrawingBuffer : false,
 			_powerPreference = parameters.powerPreference !== undefined ? parameters.powerPreference : 'default',
 			_failIfMajorPerformanceCaveat = parameters.failIfMajorPerformanceCaveat !== undefined ? parameters.failIfMajorPerformanceCaveat : false, 
-			_useOcclusionCulling = parameters.useOcclusionCulling !== undefined ? parameters.useOcclusionCulling : true;
 
 		var currentRenderList = null;
 		var currentRenderState = null;
