@@ -3,6 +3,7 @@ var files = {
 		"webgl_animation_cloth",
 		"webgl_animation_keyframes",
 		"webgl_animation_skinning_blending",
+		"webgl_animation_skinning_additive_blending",
 		"webgl_animation_skinning_morph",
 		"webgl_animation_multiple",
 		"webgl_camera",
@@ -310,6 +311,7 @@ var files = {
 		"webgl_worker_offscreencanvas"
 	],
 	"webgl2": [
+		"webgl2_buffergeometry_attributes_integer",
 		"webgl2_materials_texture2darray",
 		"webgl2_materials_texture3d",
 		"webgl2_multisampled_renderbuffers",
