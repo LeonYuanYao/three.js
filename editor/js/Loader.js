@@ -26,7 +26,9 @@ import { SetSceneCommand } from './commands/SetSceneCommand.js';
 
 import { LoaderUtils } from './LoaderUtils.js';
 
-var Loader = function ( editor ) {
+import { JSZip } from '../../examples/jsm/libs/jszip.module.min.js';
+
+function Loader( editor ) {
 
 	var scope = this;
 
@@ -519,7 +521,7 @@ var Loader = function ( editor ) {
 
 			default:
 
-				// alert( 'Unsupported file format (' + extension +  ').' );
+				console.error( 'Unsupported file format (' + extension + ').' );
 
 				break;
 
@@ -715,6 +717,6 @@ var Loader = function ( editor ) {
 
 	}
 
-};
+}
 
 export { Loader };

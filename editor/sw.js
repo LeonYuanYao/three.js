@@ -1,4 +1,4 @@
-// r115.1
+// r118.3
 
 const assets = [
 	'./',
@@ -11,12 +11,16 @@ const assets = [
 
 	'../examples/jsm/libs/chevrotain.module.min.js',
 	'../examples/jsm/libs/inflate.module.min.js',
+	'../examples/jsm/libs/jszip.module.min.js',
 
-	'../examples/js/libs/jszip.min.js',
 	'../examples/js/libs/draco/draco_decoder.js',
 	'../examples/js/libs/draco/draco_decoder.wasm',
 	'../examples/js/libs/draco/draco_encoder.js',
 	'../examples/js/libs/draco/draco_wasm_wrapper.js',
+
+	'../examples/js/libs/draco/gltf/draco_decoder.js',
+	'../examples/js/libs/draco/gltf/draco_decoder.wasm',
+	'../examples/js/libs/draco/gltf/draco_wasm_wrapper.js',
 
 	'../examples/jsm/loaders/3MFLoader.js',
 	'../examples/jsm/loaders/AMFLoader.js',
@@ -47,13 +51,17 @@ const assets = [
 	'../examples/jsm/exporters/PLYExporter.js',
 	'../examples/jsm/exporters/STLExporter.js',
 
+	'../examples/jsm/helpers/VertexNormalsHelper.js',
+
 	'../examples/jsm/geometries/TeapotBufferGeometry.js',
 
-	'../examples/js/vr/HelioWebXRPolyfill.js',
 	'../examples/jsm/webxr/VRButton.js',
 
 	'./manifest.json',
 	'./images/icon.png',
+	'./images/rotate.svg',
+	'./images/scale.svg',
+	'./images/translate.svg',
 
 	'./js/libs/codemirror/codemirror.css',
 	'./js/libs/codemirror/theme/monokai.css',
