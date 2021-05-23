@@ -1,101 +1,102 @@
 import { EventDispatcher } from '../core/EventDispatcher.js';
 import { FrontSide, FlatShading, NormalBlending, LessEqualDepth, AddEquation, OneMinusSrcAlphaFactor, SrcAlphaFactor, AlwaysStencilFunc, KeepStencilOp } from '../constants.js';
-import { MathUtils } from '../math/MathUtils.js';
+import * as MathUtils from '../math/MathUtils.js';
 
-/**
- * @author mrdoob / http://mrdoob.com/
- * @author alteredq / http://alteredqualia.com/
- */
+let materialId = 0;
 
-var materialId = 0;
+class Material extends EventDispatcher {
 
-function Material() {
+	constructor() {
 
-	Object.defineProperty( this, 'id', { value: materialId ++ } );
+		super();
 
-	this.uuid = MathUtils.generateUUID();
+		Object.defineProperty( this, 'id', { value: materialId ++ } );
 
-	this.name = '';
-	this.type = 'Material';
+		this.uuid = MathUtils.generateUUID();
 
-	this.fog = true;
+		this.name = '';
+		this.type = 'Material';
 
-	this.blending = NormalBlending;
-	this.side = FrontSide;
-	this.flatShading = false;
-	this.vertexColors = false;
+		this.fog = true;
 
-	this.opacity = 1;
-	this.transparent = false;
+		this.blending = NormalBlending;
+		this.side = FrontSide;
+		this.vertexColors = false;
 
-	this.blendSrc = SrcAlphaFactor;
-	this.blendDst = OneMinusSrcAlphaFactor;
-	this.blendEquation = AddEquation;
-	this.blendSrcAlpha = null;
-	this.blendDstAlpha = null;
-	this.blendEquationAlpha = null;
+		this.opacity = 1;
+		this.transparent = false;
 
-	this.depthFunc = LessEqualDepth;
-	this.depthTest = true;
-	this.depthWrite = true;
+		this.blendSrc = SrcAlphaFactor;
+		this.blendDst = OneMinusSrcAlphaFactor;
+		this.blendEquation = AddEquation;
+		this.blendSrcAlpha = null;
+		this.blendDstAlpha = null;
+		this.blendEquationAlpha = null;
 
-	this.stencilWriteMask = 0xff;
-	this.stencilFunc = AlwaysStencilFunc;
-	this.stencilRef = 0;
-	this.stencilFuncMask = 0xff;
-	this.stencilFail = KeepStencilOp;
-	this.stencilZFail = KeepStencilOp;
-	this.stencilZPass = KeepStencilOp;
-	this.stencilWrite = false;
+		this.depthFunc = LessEqualDepth;
+		this.depthTest = true;
+		this.depthWrite = true;
 
-	this.clippingPlanes = null;
-	this.clipIntersection = false;
-	this.clipShadows = false;
+		this.stencilWriteMask = 0xff;
+		this.stencilFunc = AlwaysStencilFunc;
+		this.stencilRef = 0;
+		this.stencilFuncMask = 0xff;
+		this.stencilFail = KeepStencilOp;
+		this.stencilZFail = KeepStencilOp;
+		this.stencilZPass = KeepStencilOp;
+		this.stencilWrite = false;
 
-	this.shadowSide = null;
+		this.clippingPlanes = null;
+		this.clipIntersection = false;
+		this.clipShadows = false;
 
-	this.colorWrite = true;
+		this.shadowSide = null;
 
-	this.precision = null; // override the renderer's default precision for this material
+		this.colorWrite = true;
 
-	this.polygonOffset = false;
-	this.polygonOffsetFactor = 0;
-	this.polygonOffsetUnits = 0;
+		this.precision = null; // override the renderer's default precision for this material
 
-	this.dithering = false;
+		this.polygonOffset = false;
+		this.polygonOffsetFactor = 0;
+		this.polygonOffsetUnits = 0;
 
-	this.alphaTest = 0;
-	this.premultipliedAlpha = false;
+		this.dithering = false;
 
-	this.visible = true;
+		this.alphaTest = 0;
+		this.alphaToCoverage = false;
+		this.premultipliedAlpha = false;
 
-	this.toneMapped = true;
+		this.visible = true;
 
-	this.userData = {};
+		this.toneMapped = true;
 
-	this.version = 0;
+		this.userData = {};
 
-}
+		this.version = 0;
 
-Material.prototype = Object.assign( Object.create( EventDispatcher.prototype ), {
+	}
 
-	constructor: Material,
+	onBuild( /* shaderobject, renderer */ ) {}
 
-	isMaterial: true,
+	onBeforeCompile( /* shaderobject, renderer */ ) {}
 
-	onBeforeCompile: function () {},
+	customProgramCacheKey() {
 
-	setValues: function ( values ) {
+		return this.onBeforeCompile.toString();
+
+	}
+
+	setValues( values ) {
 
 		if ( values === undefined ) return;
 
-		for ( var key in values ) {
+		for ( const key in values ) {
 
-			var newValue = values[ key ];
+			const newValue = values[ key ];
 
 			if ( newValue === undefined ) {
 
-				console.warn( "THREE.Material: '" + key + "' parameter is undefined." );
+				console.warn( 'THREE.Material: \'' + key + '\' parameter is undefined.' );
 				continue;
 
 			}
@@ -109,11 +110,11 @@ Material.prototype = Object.assign( Object.create( EventDispatcher.prototype ), 
 
 			}
 
-			var currentValue = this[ key ];
+			const currentValue = this[ key ];
 
 			if ( currentValue === undefined ) {
 
-				console.warn( "THREE." + this.type + ": '" + key + "' is not a property of this material." );
+				console.warn( 'THREE.' + this.type + ': \'' + key + '\' is not a property of this material.' );
 				continue;
 
 			}
@@ -134,11 +135,11 @@ Material.prototype = Object.assign( Object.create( EventDispatcher.prototype ), 
 
 		}
 
-	},
+	}
 
-	toJSON: function ( meta ) {
+	toJSON( meta ) {
 
-		var isRoot = ( meta === undefined || typeof meta === 'string' );
+		const isRoot = ( meta === undefined || typeof meta === 'string' );
 
 		if ( isRoot ) {
 
@@ -149,7 +150,7 @@ Material.prototype = Object.assign( Object.create( EventDispatcher.prototype ), 
 
 		}
 
-		var data = {
+		const data = {
 			metadata: {
 				version: 4.5,
 				type: 'Material',
@@ -199,7 +200,13 @@ Material.prototype = Object.assign( Object.create( EventDispatcher.prototype ), 
 		if ( this.map && this.map.isTexture ) data.map = this.map.toJSON( meta ).uuid;
 		if ( this.matcap && this.matcap.isTexture ) data.matcap = this.matcap.toJSON( meta ).uuid;
 		if ( this.alphaMap && this.alphaMap.isTexture ) data.alphaMap = this.alphaMap.toJSON( meta ).uuid;
-		if ( this.lightMap && this.lightMap.isTexture ) data.lightMap = this.lightMap.toJSON( meta ).uuid;
+
+		if ( this.lightMap && this.lightMap.isTexture ) {
+
+			data.lightMap = this.lightMap.toJSON( meta ).uuid;
+			data.lightMapIntensity = this.lightMapIntensity;
+
+		}
 
 		if ( this.aoMap && this.aoMap.isTexture ) {
 
@@ -240,13 +247,14 @@ Material.prototype = Object.assign( Object.create( EventDispatcher.prototype ), 
 		if ( this.envMap && this.envMap.isTexture ) {
 
 			data.envMap = this.envMap.toJSON( meta ).uuid;
-			data.reflectivity = this.reflectivity; // Scale behind envMap
-			data.refractionRatio = this.refractionRatio;
 
 			if ( this.combine !== undefined ) data.combine = this.combine;
-			if ( this.envMapIntensity !== undefined ) data.envMapIntensity = this.envMapIntensity;
 
 		}
+
+		if ( this.envMapIntensity !== undefined ) data.envMapIntensity = this.envMapIntensity;
+		if ( this.reflectivity !== undefined ) data.reflectivity = this.reflectivity;
+		if ( this.refractionRatio !== undefined ) data.refractionRatio = this.refractionRatio;
 
 		if ( this.gradientMap && this.gradientMap.isTexture ) {
 
@@ -255,10 +263,10 @@ Material.prototype = Object.assign( Object.create( EventDispatcher.prototype ), 
 		}
 
 		if ( this.size !== undefined ) data.size = this.size;
+		if ( this.shadowSide !== null ) data.shadowSide = this.shadowSide;
 		if ( this.sizeAttenuation !== undefined ) data.sizeAttenuation = this.sizeAttenuation;
 
 		if ( this.blending !== NormalBlending ) data.blending = this.blending;
-		if ( this.flatShading === true ) data.flatShading = this.flatShading;
 		if ( this.side !== FrontSide ) data.side = this.side;
 		if ( this.vertexColors ) data.vertexColors = true;
 
@@ -268,6 +276,7 @@ Material.prototype = Object.assign( Object.create( EventDispatcher.prototype ), 
 		data.depthFunc = this.depthFunc;
 		data.depthTest = this.depthTest;
 		data.depthWrite = this.depthWrite;
+		data.colorWrite = this.colorWrite;
 
 		data.stencilWrite = this.stencilWrite;
 		data.stencilWriteMask = this.stencilWriteMask;
@@ -293,6 +302,7 @@ Material.prototype = Object.assign( Object.create( EventDispatcher.prototype ), 
 		if ( this.dithering === true ) data.dithering = true;
 
 		if ( this.alphaTest > 0 ) data.alphaTest = this.alphaTest;
+		if ( this.alphaToCoverage === true ) data.alphaToCoverage = this.alphaToCoverage;
 		if ( this.premultipliedAlpha === true ) data.premultipliedAlpha = this.premultipliedAlpha;
 
 		if ( this.wireframe === true ) data.wireframe = this.wireframe;
@@ -302,7 +312,8 @@ Material.prototype = Object.assign( Object.create( EventDispatcher.prototype ), 
 
 		if ( this.morphTargets === true ) data.morphTargets = true;
 		if ( this.morphNormals === true ) data.morphNormals = true;
-		if ( this.skinning === true ) data.skinning = true;
+
+		if ( this.flatShading === true ) data.flatShading = this.flatShading;
 
 		if ( this.visible === false ) data.visible = false;
 
@@ -314,11 +325,11 @@ Material.prototype = Object.assign( Object.create( EventDispatcher.prototype ), 
 
 		function extractFromCache( cache ) {
 
-			var values = [];
+			const values = [];
 
-			for ( var key in cache ) {
+			for ( const key in cache ) {
 
-				var data = cache[ key ];
+				const data = cache[ key ];
 				delete data.metadata;
 				values.push( data );
 
@@ -330,8 +341,8 @@ Material.prototype = Object.assign( Object.create( EventDispatcher.prototype ), 
 
 		if ( isRoot ) {
 
-			var textures = extractFromCache( meta.textures );
-			var images = extractFromCache( meta.images );
+			const textures = extractFromCache( meta.textures );
+			const images = extractFromCache( meta.images );
 
 			if ( textures.length > 0 ) data.textures = textures;
 			if ( images.length > 0 ) data.images = images;
@@ -340,15 +351,15 @@ Material.prototype = Object.assign( Object.create( EventDispatcher.prototype ), 
 
 		return data;
 
-	},
+	}
 
-	clone: function () {
+	clone() {
 
 		return new this.constructor().copy( this );
 
-	},
+	}
 
-	copy: function ( source ) {
+	copy( source ) {
 
 		this.name = source.name;
 
@@ -356,7 +367,6 @@ Material.prototype = Object.assign( Object.create( EventDispatcher.prototype ), 
 
 		this.blending = source.blending;
 		this.side = source.side;
-		this.flatShading = source.flatShading;
 		this.vertexColors = source.vertexColors;
 
 		this.opacity = source.opacity;
@@ -382,16 +392,19 @@ Material.prototype = Object.assign( Object.create( EventDispatcher.prototype ), 
 		this.stencilZPass = source.stencilZPass;
 		this.stencilWrite = source.stencilWrite;
 
-		var srcPlanes = source.clippingPlanes,
-			dstPlanes = null;
+		const srcPlanes = source.clippingPlanes;
+		let dstPlanes = null;
 
 		if ( srcPlanes !== null ) {
 
-			var n = srcPlanes.length;
+			const n = srcPlanes.length;
 			dstPlanes = new Array( n );
 
-			for ( var i = 0; i !== n; ++ i )
+			for ( let i = 0; i !== n; ++ i ) {
+
 				dstPlanes[ i ] = srcPlanes[ i ].clone();
+
+			}
 
 		}
 
@@ -412,6 +425,7 @@ Material.prototype = Object.assign( Object.create( EventDispatcher.prototype ), 
 		this.dithering = source.dithering;
 
 		this.alphaTest = source.alphaTest;
+		this.alphaToCoverage = source.alphaToCoverage;
 		this.premultipliedAlpha = source.premultipliedAlpha;
 
 		this.visible = source.visible;
@@ -422,24 +436,22 @@ Material.prototype = Object.assign( Object.create( EventDispatcher.prototype ), 
 
 		return this;
 
-	},
+	}
 
-	dispose: function () {
+	dispose() {
 
 		this.dispatchEvent( { type: 'dispose' } );
 
 	}
 
-} );
-
-Object.defineProperty( Material.prototype, 'needsUpdate', {
-
-	set: function ( value ) {
+	set needsUpdate( value ) {
 
 		if ( value === true ) this.version ++;
 
 	}
 
-} );
+}
+
+Material.prototype.isMaterial = true;
 
 export { Material };

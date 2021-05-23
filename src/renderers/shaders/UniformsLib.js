@@ -6,11 +6,11 @@ import { Matrix3 } from '../../math/Matrix3.js';
  * Uniforms library for shared webgl shaders
  */
 
-var UniformsLib = {
+const UniformsLib = {
 
 	common: {
 
-		diffuse: { value: new Color( 0xeeeeee ) },
+		diffuse: { value: new Color( 0xffffff ) },
 		opacity: { value: 1.0 },
 
 		map: { value: null },
@@ -119,6 +119,7 @@ var UniformsLib = {
 
 		directionalLightShadows: { value: [], properties: {
 			shadowBias: {},
+			shadowNormalBias: {},
 			shadowRadius: {},
 			shadowMapSize: {}
 		} },
@@ -138,6 +139,7 @@ var UniformsLib = {
 
 		spotLightShadows: { value: [], properties: {
 			shadowBias: {},
+			shadowNormalBias: {},
 			shadowRadius: {},
 			shadowMapSize: {}
 		} },
@@ -154,6 +156,7 @@ var UniformsLib = {
 
 		pointLightShadows: { value: [], properties: {
 			shadowBias: {},
+			shadowNormalBias: {},
 			shadowRadius: {},
 			shadowMapSize: {},
 			shadowCameraNear: {},
@@ -175,13 +178,16 @@ var UniformsLib = {
 			position: {},
 			width: {},
 			height: {}
-		} }
+		} },
+
+		ltc_1: { value: null },
+		ltc_2: { value: null }
 
 	},
 
 	points: {
 
-		diffuse: { value: new Color( 0xeeeeee ) },
+		diffuse: { value: new Color( 0xffffff ) },
 		opacity: { value: 1.0 },
 		size: { value: 1.0 },
 		scale: { value: 1.0 },
@@ -193,7 +199,7 @@ var UniformsLib = {
 
 	sprite: {
 
-		diffuse: { value: new Color( 0xeeeeee ) },
+		diffuse: { value: new Color( 0xffffff ) },
 		opacity: { value: 1.0 },
 		center: { value: new Vector2( 0.5, 0.5 ) },
 		rotation: { value: 0.0 },
